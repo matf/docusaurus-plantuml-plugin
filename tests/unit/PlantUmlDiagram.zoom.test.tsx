@@ -87,6 +87,8 @@ beforeEach(() => {
   Element.prototype.setPointerCapture = vi.fn();
   Element.prototype.releasePointerCapture = vi.fn();
   Element.prototype.hasPointerCapture = vi.fn(() => false);
+  // The maximize overlay writes to body styles; jsdom keeps them between tests.
+  document.body.style.overflow = '';
 });
 
 afterEach(() => {
@@ -187,6 +189,7 @@ describe('accessible structure', () => {
     expect(screen.getByRole('button', {name: 'Zoom in'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Zoom out'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Reset zoom'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Maximize diagram'})).toBeInTheDocument();
   });
 
   it('describes the keyboard shortcuts without announcing them repeatedly', async () => {
@@ -300,10 +303,13 @@ describe('controls', () => {
     expect(layer().style.transform).toBe('translate(0px, 0px) scale(1)');
   });
 
-  it('offers fullscreen only where the browser supports it', async () => {
+  it('offers maximize everywhere, with no capability detection', async () => {
     await renderReady();
-    // jsdom reports no fullscreen support, so the button must not be rendered at all.
-    expect(screen.queryByRole('button', {name: 'Toggle fullscreen'})).toBeNull();
+    // An in-page overlay works in every browser, including iOS Safari where element
+    // fullscreen does not exist, so the control is never hidden.
+    const button = screen.getByRole('button', {name: 'Maximize diagram'});
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveAttribute('aria-pressed', 'false');
   });
 });
 
@@ -414,5 +420,69 @@ describe('lifecycle', () => {
 
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+});
+
+describe('maximizing', () => {
+  const maximizeButton = () => screen.getByRole('button', {name: 'Maximize diagram'});
+
+  it('fills the viewport without using the Fullscreen API', async () => {
+    // The Fullscreen API took the whole browser window fullscreen in Firefox and let the
+    // page show through its backdrop; an in-page overlay does neither.
+    const requestFullscreen = vi.fn();
+    Element.prototype.requestFullscreen = requestFullscreen;
+
+    await renderReady();
+    act(() => maximizeButton().click());
+
+    expect(figure()).toHaveAttribute('data-plantuml-maximized', 'true');
+    expect(maximizeButton()).toHaveAttribute('aria-pressed', 'true');
+    expect(requestFullscreen).not.toHaveBeenCalled();
+  });
+
+  it('locks page scrolling while maximized and restores it after', async () => {
+    document.body.style.overflow = 'auto';
+    await renderReady();
+
+    act(() => maximizeButton().click());
+    expect(document.body.style.overflow).toBe('hidden');
+
+    act(() => maximizeButton().click());
+    expect(document.body.style.overflow).toBe('auto');
+  });
+
+  it('closes on Escape', async () => {
+    await renderReady();
+    act(() => maximizeButton().click());
+    expect(figure()).toHaveAttribute('data-plantuml-maximized', 'true');
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    });
+
+    expect(figure()).not.toHaveAttribute('data-plantuml-maximized');
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('restores the previous view when un-maximized', async () => {
+    await renderReady();
+    act(() => screen.getByRole('button', {name: 'Zoom in'}).click());
+    expect(zoomLevel()).toBe('1.25');
+
+    act(() => maximizeButton().click());
+    act(() => maximizeButton().click());
+
+    expect(zoomLevel()).toBe('1.25');
+  });
+
+  it('does not leave the page scroll-locked when unmounted while maximized', async () => {
+    document.body.style.overflow = 'auto';
+    const {unmount} = await renderReady();
+    act(() => maximizeButton().click());
+    expect(document.body.style.overflow).toBe('hidden');
+
+    unmount();
+
+    expect(document.body.style.overflow).toBe('auto');
   });
 });

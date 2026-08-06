@@ -45,6 +45,7 @@ test.describe('zoom and pan', () => {
     const group = wide.getByRole('group', {name: /zoom controls/});
     await expect(group).toBeVisible();
     await expect(group.getByRole('button')).toHaveCount(4);
+    await expect(group.getByRole('button', {name: 'Maximize diagram'})).toBeVisible();
 
     // `zoom=false` on the fence removes all of it.
     const optedOut = figures.nth(1);
@@ -249,6 +250,52 @@ test.describe('zoom and pan', () => {
 
     // Anything narrower here would make a full-width diagram a mobile scroll trap.
     expect(touchAction).toBe('pan-y pinch-zoom');
+  });
+
+  test('maximizing covers the page opaquely and does not use the Fullscreen API', async ({
+    page,
+  }) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    await figure.getByRole('button', {name: 'Maximize diagram'}).click();
+
+    await expect(figure).toHaveAttribute('data-plantuml-maximized', 'true');
+
+    // The Fullscreen API is deliberately unused: Firefox takes the whole browser window
+    // fullscreen with it, and its backdrop lets the page show through.
+    expect(await page.evaluate(() => document.fullscreenElement !== null)).toBe(false);
+
+    // The overlay covers the viewport and is fully opaque.
+    const stage = page.locator(`${zoomable} [class*="maximized"]`).first();
+    const box = await rectOf(stage);
+    const viewportSize = page.viewportSize();
+    expect(box.width).toBeGreaterThanOrEqual((viewportSize?.width ?? 0) - 1);
+    expect(box.height).toBeGreaterThanOrEqual((viewportSize?.height ?? 0) - 1);
+
+    // Opaque in *both* colour modes. Infima's `--ifm-background-color` is `#0000` in light
+    // mode, so a transparent overlay passes a dark-mode-only check and still lets the page
+    // show through for most readers.
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+      const background = await stage.evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(background, `${theme} mode overlay background`).not.toBe('transparent');
+      // `rgb(...)` is opaque by definition; only `rgba(...)` carries an alpha channel.
+      const parts = /^rgba?\(([^)]+)\)$/.exec(background)?.[1]?.split(',') ?? [];
+      const alpha = parts.length === 4 ? Number(parts[3]) : 1;
+      expect(alpha, `${theme} mode overlay opacity (${background})`).toBe(1);
+    }
+
+    // Page scrolling is locked while the overlay is up.
+    expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe('hidden');
+
+    // Escape closes it and restores scrolling.
+    await page.keyboard.press('Escape');
+    await expect(figure).not.toHaveAttribute('data-plantuml-maximized', 'true');
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.body).overflow))
+      .not.toBe('hidden');
   });
 
   test('does not interfere with ordinary diagram pages', async ({page}) => {

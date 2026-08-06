@@ -198,12 +198,16 @@ export default function PlantUmlDiagram({
         [DATA_ATTR.status]: state.status,
         [DATA_ATTR.theme]: dark ? 'dark' : 'light',
         ...(interactive ? {[DATA_ATTR.interactive]: 'true'} : {}),
+        ...(zoom.maximized ? {[DATA_ATTR.maximized]: 'true'} : {}),
       }}
     >
       {state.status === 'ready' && state.svg !== null && !interactive && canvas}
 
       {state.status === 'ready' && state.svg !== null && interactive && (
-        <div ref={zoom.stageRef} className={styles.stage}>
+        <div
+          ref={zoom.stageRef}
+          className={zoom.maximized ? `${styles.stage} ${styles.maximized}` : styles.stage}
+        >
           <div
             ref={zoom.viewportRef}
             className={styles.viewport}
@@ -252,16 +256,15 @@ export default function PlantUmlDiagram({
             >
               <span aria-hidden="true">⟲</span>
             </button>
-            {zoom.fullscreenSupported && (
-              <button
-                type="button"
-                className={styles.toolbarButton}
-                aria-label="Toggle fullscreen"
-                onClick={zoom.toggleFullscreen}
-              >
-                <span aria-hidden="true">⛶</span>
-              </button>
-            )}
+            <button
+              type="button"
+              className={styles.toolbarButton}
+              aria-label="Maximize diagram"
+              aria-pressed={zoom.maximized}
+              onClick={zoom.toggleMaximize}
+            >
+              <span aria-hidden="true">{zoom.maximized ? '✕' : '⛶'}</span>
+            </button>
             {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
             <span ref={zoom.readoutRef} className={styles.readout} aria-hidden="true">
               100%
