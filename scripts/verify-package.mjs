@@ -73,27 +73,51 @@ try {
 }
 
 /**
- * Extracts the JSON array, tolerating anything npm prints around it.
+ * Reads the pack result, tolerating both the shapes npm has used and any notices printed
+ * around the payload.
  *
- * Slicing only from the first `[` is not enough: npm can emit notices *after* the payload too,
- * and `JSON.parse` rejects trailing content.
+ * npm 11 emits an array of results. Newer npm emits an object keyed by package name. Pinning
+ * to one shape breaks the moment CI and a developer's machine disagree about the npm version,
+ * which is exactly what happened here — the publish workflow installs `npm@latest`.
  */
 function parsePackOutput(output) {
-  const start = output.indexOf('[');
-  const end = output.lastIndexOf(']');
-  if (start === -1 || end === -1 || end < start) {
-    console.error('Could not find a JSON array in `npm pack --json` output:\n', output);
+  const firstBrace = output.search(/[[{]/);
+  if (firstBrace === -1) {
+    console.error('Found no JSON in `npm pack --json` output:\n', output);
     process.exit(1);
   }
-  try {
-    return JSON.parse(output.slice(start, end + 1));
-  } catch (error) {
-    console.error('Could not parse `npm pack --json` output:\n', output, '\n', error.message);
+
+  // Trailing notices are possible too, so shrink from the end until it parses.
+  const candidate = output.slice(firstBrace);
+  let parsed;
+  for (let end = candidate.length; end > 0; end -= 1) {
+    const closer = candidate.lastIndexOf('}', end - 1);
+    const bracket = candidate.lastIndexOf(']', end - 1);
+    const cut = Math.max(closer, bracket);
+    if (cut === -1) break;
+    try {
+      parsed = JSON.parse(candidate.slice(0, cut + 1));
+      break;
+    } catch {
+      end = cut;
+    }
+  }
+
+  if (parsed === undefined) {
+    console.error('Could not parse `npm pack --json` output:\n', output);
     process.exit(1);
   }
+
+  const results = Array.isArray(parsed) ? parsed : Object.values(parsed);
+  const first = results[0];
+  if (!first || !Array.isArray(first.files)) {
+    console.error('`npm pack --json` returned no file list:\n', JSON.stringify(parsed, null, 2));
+    process.exit(1);
+  }
+  return first;
 }
 
-const result = parsePackOutput(packOutput)[0];
+const result = parsePackOutput(packOutput);
 const files = result.files.map((file) => ({path: file.path, size: file.size}));
 const problems = [];
 
