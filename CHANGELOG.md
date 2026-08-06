@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2]
+
+### Fixed
+
+- The zoom buttons and keyboard shortcuts now zoom about the viewport's top-left corner rather
+  than its centre. A diagram that fits its viewport is left-aligned, so the empty space is to
+  its right and below; zooming about the centre scaled that empty space and pushed the diagram
+  off the top and left edges, most visibly on a maximized diagram. Wheel zoom continues to
+  track the pointer.
+
 ## [1.0.1]
 
 ### Fixed
@@ -86,7 +96,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/matf/docusaurus-plantuml-plugin/releases/tag/v0.1.0

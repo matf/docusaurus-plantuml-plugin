@@ -112,13 +112,20 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     apply(IDENTITY);
   }, [apply]);
 
-  /** Zooms about the middle of the viewport, which is what buttons and keys should do. */
+  /**
+   * Zooms about the viewport's top-left corner.
+   *
+   * Not the centre: a diagram rarely fills its viewport, and a diagram that fits is
+   * left-aligned, so the empty space sits to its right and below. Zooming about the centre
+   * scales that empty space too and pushes the diagram off the top and left edges — most
+   * visibly when maximized. Anchoring at the top-left leaves a left-aligned diagram exactly
+   * where it is and grows it into the empty space, keeping it visible as long as possible.
+   *
+   * Wheel zoom still tracks the pointer, which is what direct manipulation should do.
+   */
   const zoomByStep = useCallback(
     (factor: number) => {
-      const viewport = viewportRef.current;
-      const focalX = (viewport?.clientWidth ?? 0) / 2;
-      const focalY = (viewport?.clientHeight ?? 0) / 2;
-      apply(zoomAbout(transformRef.current, factor, focalX, focalY));
+      apply(zoomAbout(transformRef.current, factor, 0, 0));
     },
     [apply],
   );

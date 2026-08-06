@@ -298,6 +298,35 @@ test.describe('zoom and pan', () => {
       .not.toBe('hidden');
   });
 
+  test('button zoom keeps the diagram anchored at the top-left, including maximized', async ({
+    page,
+  }) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    await figure.getByRole('button', {name: 'Maximize diagram'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-maximized', 'true');
+
+    const layer = layerOf(figure);
+    const before = await rectOf(layer);
+
+    const zoomIn = figure.getByRole('button', {name: 'Zoom in'});
+    await zoomIn.click();
+    await zoomIn.click();
+    await zoomIn.click();
+    await expect.poll(() => zoomLevel(page)).toBeGreaterThan(1.9);
+    await expect.poll(async () => (await rectOf(layer)).width).toBeGreaterThan(before.width * 1.5);
+
+    const after = await rectOf(layer);
+    // The whole point: the diagram grows down and right into the empty space rather than
+    // being pushed off the top and left edges, which is what centre-anchored zoom did.
+    expect(Math.abs(after.x - before.x), 'left edge must not move').toBeLessThanOrEqual(1);
+    expect(Math.abs(after.y - before.y), 'top edge must not move').toBeLessThanOrEqual(1);
+
+    await page.keyboard.press('Escape');
+  });
+
   test('does not interfere with ordinary diagram pages', async ({page}) => {
     const seen = monitor(page, ORIGIN);
     await page.goto('docs/multiple-diagrams');

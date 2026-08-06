@@ -277,6 +277,13 @@ The diagram viewport is focusable. Once focused:
 Keys with Ctrl, Cmd or Alt held are left to the browser, so shortcuts such as Ctrl + 0 keep
 working, and `Tab` always moves on — the diagram is never a keyboard trap.
 
+The toolbar buttons and the keyboard zoom about the **top-left corner** of the viewport, while
+the wheel zooms about the **pointer**. That difference is deliberate: a diagram rarely fills its
+viewport, and one that fits is left-aligned, so the empty space sits to its right and below.
+Zooming about the centre would scale that empty space and push the diagram off the top and left
+edges — most visibly when maximized. Anchoring at the top-left grows the diagram into the empty
+space instead and keeps it visible as long as possible.
+
 Scale is limited to 0.25×–8×, and the view resets to 100% whenever the diagram source or the
 site colour mode changes.
 
