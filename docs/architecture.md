@@ -314,6 +314,15 @@ The `wheel` listener has to be registered imperatively with `{passive: false}`: 
 its JSX `onWheel` prop passively at the root, so `preventDefault()` from there is a silent
 no-op. Key handlers do use the JSX prop, because React key events are not passive.
 
+**Maximizing is an in-page overlay, not the Fullscreen API.** `requestFullscreen()` fullscreens
+the whole browser window in Firefox rather than presenting the element, and its `::backdrop` is
+outside the element, so the page showed through behind the diagram. A `position: fixed` overlay
+with an opaque background fixes both, is identical across browsers, and needs no capability
+detection — which also restores the control on iOS Safari. It is the one piece of zoom state
+held in React, because it drives markup and changes only on an explicit user action. Entering
+locks body scrolling and fits the diagram to the viewport; leaving restores the previous
+transform and the previous overflow.
+
 **Both reset triggers are necessary.** The view resets when the diagram source or the colour
 mode changes. One reset runs when the listener effect re-arms (the layer node was replaced),
 and a second runs directly off the reset key — because a cache hit resolves _before_ any phase

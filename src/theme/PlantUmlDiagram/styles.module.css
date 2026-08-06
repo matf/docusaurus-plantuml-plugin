@@ -108,22 +108,34 @@
   text-align: right;
 }
 
-.stage:fullscreen {
+/*
+ * Maximized is an in-page overlay, not the Fullscreen API.
+ *
+ * `requestFullscreen()` took the whole browser window fullscreen in Firefox, and its
+ * `::backdrop` sits outside the element so the page showed through behind the diagram. A
+ * fixed overlay is fully opaque, behaves the same everywhere, and needs no capability check.
+ */
+.maximized {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ifm-z-index-overlay, 400);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ifm-background-color);
+  /*
+   * `--ifm-background-surface-color`, not `--ifm-background-color`: Infima defines the latter
+   * as `#0000` in light mode, so the overlay would be transparent and the page would show
+   * through — which is the defect this overlay exists to fix. The surface colour is opaque in
+   * both colour modes (white / #242526), and a `var()` fallback would not have saved us here,
+   * because the variable is defined, just transparent.
+   */
+  background: var(--ifm-background-surface-color, #ffffff);
 }
 
-.stage:fullscreen .viewport {
+.maximized .viewport {
   width: 100vw;
   height: 100dvh;
   max-height: none;
-}
-
-/* The default backdrop is black, which makes a transparent light-mode diagram look broken. */
-.stage::backdrop {
-  background: var(--ifm-background-color, #ffffff);
 }
 
 .visuallyHidden {

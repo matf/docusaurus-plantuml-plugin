@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MutableRefObject,
 } from 'react';
@@ -26,11 +27,12 @@ import {
 } from './zoomMath.js';
 
 /**
- * Zoom, pan and fullscreen for one diagram.
+ * Zoom, pan and maximize for one diagram.
  *
- * The hook holds no React state at all. The transform lives in a ref and is written straight
- * to the DOM, so panning never re-renders the component — and, more usefully, "no state update
- * after unmount" becomes structurally true rather than something a guard has to enforce.
+ * The transform lives in a ref and is written straight to the DOM, so panning and zooming
+ * never re-render the component. The single piece of React state is `maximized`, which changes
+ * only on an explicit click or Escape — it drives markup, so it belongs in React, and at one
+ * transition per user action it costs nothing.
  */
 
 /** Distance the pointer must travel before a press becomes a drag rather than a click. */
@@ -47,10 +49,10 @@ export interface ZoomPanHandle {
   zoomIn: () => void;
   zoomOut: () => void;
   reset: () => void;
-  toggleFullscreen: () => void;
+  toggleMaximize: () => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
-  /** Whether this browser can fullscreen an element, so the button can be hidden if not. */
-  fullscreenSupported: boolean;
+  /** Whether the diagram currently fills the browser viewport. */
+  maximized: boolean;
 }
 
 export interface UseZoomPanParams {
@@ -62,40 +64,16 @@ export interface UseZoomPanParams {
   resetKey: string;
 }
 
-interface FullscreenCapableElement extends HTMLElement {
-  webkitRequestFullscreen?: () => Promise<void> | void;
-}
-
-interface FullscreenCapableDocument extends Document {
-  webkitFullscreenElement?: Element | null;
-  webkitExitFullscreen?: () => Promise<void> | void;
-}
-
-function supportsFullscreen(): boolean {
-  if (typeof document === 'undefined') return false;
-  const doc = document as FullscreenCapableDocument;
-  return Boolean(
-    doc.fullscreenEnabled ||
-    typeof (document.documentElement as FullscreenCapableElement).webkitRequestFullscreen ===
-      'function',
-  );
-}
-
-function currentFullscreenElement(): Element | null {
-  if (typeof document === 'undefined') return null;
-  const doc = document as FullscreenCapableDocument;
-  return doc.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
-}
-
 export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const layerRef = useRef<HTMLDivElement | null>(null);
   const readoutRef = useRef<HTMLSpanElement | null>(null);
 
+  const [maximized, setMaximized] = useState(false);
   const transformRef = useRef<Transform>(IDENTITY);
-  /** The view to restore when leaving fullscreen. */
-  const beforeFullscreenRef = useRef<Transform | null>(null);
+  /** The view to restore when the diagram is un-maximized. */
+  const beforeMaximizeRef = useRef<Transform | null>(null);
   const frameRef = useRef<number | null>(null);
 
   /**
@@ -148,17 +126,8 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
   const zoomIn = useCallback(() => zoomByStep(SCALE_STEP), [zoomByStep]);
   const zoomOut = useCallback(() => zoomByStep(1 / SCALE_STEP), [zoomByStep]);
 
-  const toggleFullscreen = useCallback(() => {
-    const stage = stageRef.current as FullscreenCapableElement | null;
-    if (!stage) return;
-
-    const doc = document as FullscreenCapableDocument;
-    if (currentFullscreenElement()) {
-      void (doc.exitFullscreen?.() ?? doc.webkitExitFullscreen?.());
-      return;
-    }
-    beforeFullscreenRef.current = transformRef.current;
-    void (stage.requestFullscreen?.() ?? stage.webkitRequestFullscreen?.());
+  const toggleMaximize = useCallback(() => {
+    setMaximized((previous) => !previous);
   }, []);
 
   const onKeyDown = useCallback(
@@ -315,19 +284,6 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
       event.stopPropagation();
     };
 
-    const onFullscreenChange = () => {
-      const stage = stageRef.current;
-      const isFullscreen = stage !== null && currentFullscreenElement() === stage;
-      if (isFullscreen) {
-        // Fill the screen: the viewport is much larger now, so refit rather than keep a
-        // transform that was computed for a column-width box.
-        apply({...IDENTITY, k: fitScale(measure())});
-      } else {
-        apply(beforeFullscreenRef.current ?? IDENTITY);
-        beforeFullscreenRef.current = null;
-      }
-    };
-
     viewport.addEventListener('wheel', onWheel, {passive: false});
     viewport.addEventListener('pointerdown', onPointerDown);
     viewport.addEventListener('pointermove', onPointerMove);
@@ -335,8 +291,6 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     viewport.addEventListener('pointercancel', endDrag);
     viewport.addEventListener('lostpointercapture', endDrag);
     viewport.addEventListener('click', onClickCapture, true);
-    document.addEventListener('fullscreenchange', onFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 
     // Re-clamp when the column width changes (window resize, sidebar collapse), so a panned
     // diagram cannot end up stranded outside a narrower viewport.
@@ -354,8 +308,6 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
       viewport.removeEventListener('pointercancel', endDrag);
       viewport.removeEventListener('lostpointercapture', endDrag);
       viewport.removeEventListener('click', onClickCapture, true);
-      document.removeEventListener('fullscreenchange', onFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
       observer?.disconnect();
       if (frameRef.current !== null) {
         cancelAnimationFrame(frameRef.current);
@@ -383,6 +335,50 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     write(IDENTITY);
   }, [enabled, resetKey, write]);
 
+  /**
+   * Maximizing is done in the page, not with the Fullscreen API.
+   *
+   * `requestFullscreen()` gave two problems it cannot solve: Firefox takes the whole browser
+   * window fullscreen rather than presenting the element, and the `::backdrop` is outside the
+   * element so the page behind it shows through. A fixed-position overlay we own has neither
+   * issue, works identically in every browser, and needs no capability detection — which also
+   * restores the control on iOS Safari, where element fullscreen does not exist.
+   */
+  useEffect(() => {
+    if (!enabled || !maximized) return undefined;
+
+    beforeMaximizeRef.current = transformRef.current;
+
+    // The overlay covers the viewport; scrolling the page underneath it would be confusing.
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    body.style.overflow = 'hidden';
+
+    // The layout is already committed by the time an effect runs, so the viewport now
+    // reports its maximized size and the diagram can be fitted to it.
+    apply({...IDENTITY, k: fitScale(measure())});
+    viewportRef.current?.focus();
+
+    const onKeyDownDocument = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setMaximized(false);
+    };
+    document.addEventListener('keydown', onKeyDownDocument);
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDownDocument);
+      body.style.overflow = previousOverflow;
+      apply(beforeMaximizeRef.current ?? IDENTITY);
+      beforeMaximizeRef.current = null;
+    };
+  }, [apply, enabled, maximized, measure]);
+
+  // A diagram that is re-rendered or unmounted must not leave the page scroll-locked.
+  useEffect(() => {
+    if (!enabled) setMaximized(false);
+  }, [enabled]);
+
   return {
     stageRef,
     viewportRef,
@@ -391,9 +387,9 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     zoomIn,
     zoomOut,
     reset,
-    toggleFullscreen,
+    toggleMaximize,
     onKeyDown,
-    fullscreenSupported: supportsFullscreen(),
+    maximized,
   };
 }
 

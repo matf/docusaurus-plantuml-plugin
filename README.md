@@ -257,7 +257,7 @@ pannable by default, with a small control toolbar in the top-right corner.
 | Drag                                | Pans, once zoomed in                 |
 | One finger on a touchscreen         | Scrolls the page                     |
 | Two-finger pinch on a touchscreen   | The browser's own page zoom          |
-| Toolbar buttons                     | Zoom out, zoom in, reset, fullscreen |
+| Toolbar buttons                     | Zoom out, zoom in, reset, maximize   |
 
 `Cmd` + wheel is deliberately **not** intercepted: on macOS that is the browser's own page
 zoom, and taking it over would fight the platform.
@@ -279,6 +279,18 @@ working, and `Tab` always moves on — the diagram is never a keyboard trap.
 
 Scale is limited to 0.25×–8×, and the view resets to 100% whenever the diagram source or the
 site colour mode changes.
+
+### Maximizing
+
+The fourth toolbar button expands the diagram to fill the browser viewport, fitted to the
+available space, over an opaque background. <kbd>Escape</kbd> or the same button restores it,
+along with whatever zoom level you had before.
+
+This is an in-page overlay rather than the Fullscreen API. `requestFullscreen()` takes the
+entire browser window fullscreen in Firefox instead of presenting the element, and its
+`::backdrop` sits outside the element so the page shows through behind the diagram. An overlay
+has neither problem, behaves identically in every browser, and needs no capability detection —
+so the control also works on iOS Safari, which has no element fullscreen at all.
 
 ### Turning it off
 
@@ -528,8 +540,6 @@ The runtime requires:
 - Pointer Events — required for drag-to-pan when `zoom` is enabled
 - `ResizeObserver` — optional; without it zoom still works, but the view is not re-clamped when
   the column is resized
-- `Element.requestFullscreen()` — optional; the fullscreen button is simply not rendered where
-  it is unavailable, which includes iOS Safari
 
 That is modern evergreen Chrome, Edge, Firefox and Safari. Internet Explorer is not
 supported and will not be.
@@ -774,8 +784,6 @@ package.
   the browser reports it as Ctrl + wheel.
 - **Zoom state is not persisted.** Navigating away and back, or switching colour mode, returns
   the diagram to 100%.
-- **No fullscreen on iOS Safari.** It does not implement `Element.requestFullscreen()`, so the
-  button is not shown there.
 
 ## Troubleshooting
 

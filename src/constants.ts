@@ -33,4 +33,6 @@ export const DATA_ATTR = {
    * the imperative zoom writes can never race React's attribute diffing.
    */
   zoom: 'data-plantuml-zoom',
+  /** `"true"` on the figure while the diagram fills the browser viewport. */
+  maximized: 'data-plantuml-maximized',
 } as const;

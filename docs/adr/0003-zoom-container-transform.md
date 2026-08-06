@@ -135,6 +135,10 @@ easier to unit-test than to configure around.
 **Hover-revealed controls.** Rejected: `:hover` does not exist on touch devices, and fading
 resting controls risks the WCAG 1.4.11 non-text contrast requirement.
 
-**Fullscreen via a second component.** Not needed; the existing stage element is fullscreened
-directly, with the previous transform saved and restored, and the button is feature-detected so
-it is simply absent on iOS Safari, which has no element fullscreen.
+**The Fullscreen API.** Shipped in 1.0.0 and withdrawn in 1.0.1. Two defects, both reported
+from real use: Firefox takes the entire browser window fullscreen rather than presenting the
+element, and `::backdrop` sits outside the fullscreened element, so the page remained visible
+behind a diagram with a transparent background. Replaced by a `position: fixed` in-page overlay
+with an opaque background, which behaves identically everywhere, needs no capability detection,
+and consequently works on iOS Safari — where `Element.requestFullscreen()` does not exist and
+the control previously had to be hidden entirely.

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1]
+
+### Fixed
+
+- Maximizing a diagram no longer uses the Fullscreen API. It took the whole browser window
+  fullscreen in Firefox instead of presenting the diagram, and the `::backdrop` sits outside
+  the fullscreened element, so the page showed through behind a diagram with a transparent
+  background. The diagram now expands into an opaque in-page overlay that fills the browser
+  viewport, closed with the same button or <kbd>Escape</kbd>.
+- The maximize control is now available in every browser. It previously required
+  `Element.requestFullscreen()` and was hidden where that is missing, notably iOS Safari.
+
+### Added
+
+- `data-plantuml-maximized` on the figure while a diagram fills the viewport.
+
+### Changed
+
+- The fourth toolbar button is labelled `Maximize diagram` (was `Toggle fullscreen`) and
+  exposes `aria-pressed`. End-to-end tests selecting it by its accessible name need updating.
+
 ## [1.0.0]
 
 First stable release. The public surface — plugin options, fence metadata flags, the `data-*`
@@ -65,6 +86,7 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/matf/docusaurus-plantuml-plugin/releases/tag/v0.1.0

@@ -118,7 +118,7 @@ export function wheelZoomFactor(normalizedDelta: number): number {
 /**
  * Largest scale at which the whole diagram still fits inside the given viewport.
  *
- * Used when entering fullscreen. Small diagrams are magnified rather than left stranded in
+ * Used when maximizing. Small diagrams are magnified rather than left stranded in
  * the middle of a large screen — the output is vector, so it stays crisp — but never beyond
  * `max`, and never below {@link MIN_SCALE}.
  */
