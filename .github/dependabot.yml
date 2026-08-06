@@ -1,0 +1,43 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Docusaurus packages are released in lockstep; splitting them across PRs only
+      # produces version mismatches that fail CI.
+      docusaurus:
+        patterns: ['@docusaurus/*']
+      dev-tooling:
+        patterns:
+          - 'eslint*'
+          - '@eslint/*'
+          - 'typescript-eslint'
+          - 'prettier*'
+          - 'vitest'
+          - '@vitest/*'
+          - '@testing-library/*'
+          - 'tsup'
+          - 'typescript'
+    ignore:
+      # The engine's asset layout is part of this plugin's contract, so its major versions
+      # are reviewed by hand rather than merged automatically.
+      - dependency-name: '@plantuml/core'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: npm
+    directory: '/examples/docusaurus'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      docusaurus:
+        patterns: ['@docusaurus/*']
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly

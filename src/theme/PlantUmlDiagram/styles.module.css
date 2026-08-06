@@ -1,0 +1,107 @@
+.figure {
+  margin: 0 0 1.25rem;
+  padding: 0;
+}
+
+.canvas {
+  display: flex;
+  justify-content: flex-start;
+  overflow-x: auto;
+}
+
+.canvas svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 4rem;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.875rem;
+}
+
+.spinner {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid var(--ifm-color-emphasis-400);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: plantuml-spin 0.8s linear infinite;
+}
+
+@keyframes plantuml-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+.caption {
+  margin-top: 0.5rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+/*
+ * Failure is signalled by the "Error" label and the icon as well as by colour, so the state
+ * remains readable for colour-blind readers and in forced-colours mode.
+ */
+.error {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--ifm-color-danger-dark);
+  border-left-width: 4px;
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-color-danger-contrast-background);
+  color: var(--ifm-color-danger-contrast-foreground);
+}
+
+.errorHeading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.errorIcon {
+  flex: none;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.errorMessage {
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.errorDetails {
+  margin-top: 0.75rem;
+}
+
+.errorDetails summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.source {
+  margin: 0.5rem 0 0;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+}

@@ -1,0 +1,32 @@
+---
+sidebar_position: 2
+title: Diagram in MDX
+---
+
+import Admonition from '@theme/Admonition';
+
+# Diagram in an MDX document
+
+<Admonition type="info" title="MDX">
+  The same fence syntax works in `.mdx` files, alongside JSX components.
+</Admonition>
+
+```plantuml title="Deployment overview"
+@startuml
+node "Browser" as browser
+node "CDN-free static host" as host
+database "No server" as none
+
+browser --> host : GET /plantuml-test/
+host --> browser : HTML + JS + PlantUML runtime
+browser --> browser : render SVG locally
+@enduml
+```
+
+The `puml` alias works here too:
+
+```puml
+@startuml
+Alice -> Bob : puml alias in MDX
+@enduml
+```

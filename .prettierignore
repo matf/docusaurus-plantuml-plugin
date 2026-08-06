@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+build/
+.docusaurus/
+test-results/
+playwright-report/
+blob-report/
+.tmp-integration/
+package-lock.json
+CHANGELOG.md
+*.tgz
+docs/spec.md

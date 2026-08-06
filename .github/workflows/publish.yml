@@ -1,0 +1,85 @@
+# The filename must stay exactly `publish.yml`: npm's trusted-publisher configuration is
+# bound to the workflow filename, and renaming this file revokes publishing access.
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# `id-token: write` is what lets npm's trusted publishing exchange a GitHub OIDC token for
+# short-lived publish credentials. No npm token exists anywhere in this repository.
+permissions:
+  contents: read
+  id-token: write
+
+# Two pushes of the same tag must never race into two publish attempts.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify and publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Configure required reviewers on this environment in the repository settings to gate
+    # releases behind manual approval.
+    environment: npm
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - name: Ensure npm is new enough for trusted publishing
+        run: |
+          set -euo pipefail
+          npm install -g npm@latest
+          npm --version
+          node --version
+
+      - name: Install dependencies from the lockfile
+        run: npm ci
+
+      - name: Check project metadata is in sync
+        run: npm run sync:check
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit and component tests
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify packed package contents
+        run: npm run pack:check
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Packed-package Docusaurus integration test
+        run: npm run test:integration
+
+      - name: Verify the tag matches package.json and the tree is clean
+        id: release
+        run: npm run verify:tag
+
+      - name: Inspect exactly what will be published
+        run: npm pack --dry-run
+
+      - name: Publish to npm with provenance via OIDC
+        # No NODE_AUTH_TOKEN and no .npmrc credentials: authentication comes from the OIDC
+        # token exchange that npm performs for trusted publishers.
+        run: npm publish --access public --tag "${{ steps.release.outputs.dist_tag }}"
