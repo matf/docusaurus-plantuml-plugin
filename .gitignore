@@ -1,0 +1,25 @@
+node_modules/
+dist/
+coverage/
+*.tgz
+
+# Docusaurus
+.docusaurus/
+build/
+.cache-loader/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Integration harness scratch space
+.tmp-integration/
+
+# Editors / OS
+.DS_Store
+*.log
+.idea/
+.vscode/
+!.vscode/extensions.json

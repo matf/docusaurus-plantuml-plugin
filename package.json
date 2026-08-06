@@ -1,0 +1,112 @@
+{
+  "name": "@matfsw/docusaurus-plantuml-plugin",
+  "version": "0.1.0",
+  "description": "Render PlantUML diagrams in Docusaurus 3 entirely in the browser - no Java, no PlantUML server, no CDN.",
+  "keywords": [
+    "docusaurus",
+    "docusaurus-plugin",
+    "plantuml",
+    "uml",
+    "diagram",
+    "svg",
+    "browser"
+  ],
+  "license": "MIT",
+  "author": "",
+  "homepage": "https://github.com/matf/docusaurus-plantuml-plugin#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matf/docusaurus-plantuml-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/matf/docusaurus-plantuml-plugin/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./theme/*": "./dist/theme/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && tsc -p tsconfig.build.json && tsup && node scripts/finalize-build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "node scripts/test-packed-example.mjs",
+    "test:e2e": "playwright test",
+    "test:all": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run pack:check && npm run test:integration",
+    "pack:check": "node scripts/verify-package.mjs",
+    "verify:tag": "node scripts/verify-tag-version.mjs",
+    "sync:meta": "node scripts/sync-project-metadata.mjs",
+    "sync:check": "node scripts/sync-project-metadata.mjs --check",
+    "example:install": "npm --prefix examples/docusaurus install",
+    "example:build": "npm --prefix examples/docusaurus run build",
+    "example:serve": "npm --prefix examples/docusaurus run serve",
+    "example:start": "npm --prefix examples/docusaurus run start",
+    "prepublishOnly": "node scripts/assert-built.mjs"
+  },
+  "dependencies": {
+    "@plantuml/core": "^1.2026.6",
+    "copy-webpack-plugin": "^12.0.2",
+    "dompurify": "^3.2.7"
+  },
+  "peerDependencies": {
+    "@docusaurus/core": "^3.5.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@docusaurus/core": "^3.9.2",
+    "@docusaurus/module-type-aliases": "^3.9.2",
+    "@docusaurus/preset-classic": "^3.9.2",
+    "@docusaurus/theme-classic": "^3.9.2",
+    "@docusaurus/tsconfig": "^3.9.2",
+    "@docusaurus/types": "^3.9.2",
+    "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.57.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.18.13",
+    "@types/react": "^18.3.27",
+    "@types/react-dom": "^18.3.7",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^16.5.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.6.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsup": "^8.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^3.2.4"
+  }
+}

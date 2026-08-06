@@ -1,0 +1,188 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Nothing in CI writes to the repository or to any registry.
+permissions:
+  contents: read
+
+# A newer push to the same branch or PR supersedes the run in progress.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NPM_CONFIG_FUND: 'false'
+  NPM_CONFIG_AUDIT: 'false'
+
+jobs:
+  static-analysis:
+    name: Format, lint and types
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check project metadata is in sync
+        run: npm run sync:check
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+
+  unit-tests:
+    name: Unit tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Run unit and component tests with coverage
+        run: npm run test:coverage
+      - name: Upload coverage
+        if: matrix.node == 22
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  build:
+    name: Build and verify package contents
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Verify the packed tarball contents
+        run: npm run pack:check
+
+  packed-integration:
+    name: Packed package + Docusaurus build + Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Build, pack, install the tarball into a clean site, serve it and run Playwright
+        run: npm run test:integration
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  docusaurus-compatibility:
+    name: Docusaurus ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest Docusaurus 3 release this plugin claims to support.
+          - label: '3.5.2 (oldest supported)'
+            docusaurus: 3.5.2
+            node: 20
+          # Whatever the example site currently pins.
+          - label: 'pinned by the example'
+            docusaurus: pinned
+            node: 22
+          # The newest 3.x, resolved explicitly so a future 4.0 cannot be picked up.
+          - label: 'latest 3.x'
+            docusaurus: latest3
+            node: 22
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Resolve the Docusaurus version under test
+        id: resolve
+        run: |
+          set -euo pipefail
+          case "${{ matrix.docusaurus }}" in
+            pinned)
+              version=""
+              ;;
+            latest3)
+              # `npm view '@docusaurus/core@3' version` prints every matching 3.x release;
+              # take the last, which is the newest 3.x and never a 4.0 prerelease.
+              version="$(npm view '@docusaurus/core@^3' version --json \
+                | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{const v=JSON.parse(s);console.log(Array.isArray(v)?v[v.length-1]:v)})')"
+              ;;
+            *)
+              version="${{ matrix.docusaurus }}"
+              ;;
+          esac
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Testing against Docusaurus ${version:-(pinned by the example)}"
+      - name: Pin the example site to that Docusaurus version
+        if: steps.resolve.outputs.version != ''
+        run: |
+          set -euo pipefail
+          version='${{ steps.resolve.outputs.version }}'
+          node -e '
+            const fs = require("fs");
+            const [version] = process.argv.slice(1);
+            const file = "examples/docusaurus/package.json";
+            const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+            for (const group of ["dependencies", "devDependencies"]) {
+              for (const name of Object.keys(pkg[group] ?? {})) {
+                if (name.startsWith("@docusaurus/")) pkg[group][name] = version;
+              }
+            }
+            fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+          ' "$version"
+          cat examples/docusaurus/package.json
+      - name: Run the packed-package integration test
+        run: npm run test:integration
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-docusaurus-${{ matrix.docusaurus }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

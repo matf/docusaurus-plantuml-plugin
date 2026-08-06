@@ -1,0 +1,9 @@
+{
+  "$comment": "Single source of truth for project identity. Run `npm run sync:meta` after editing; `npm run sync:check` verifies that every derived file is up to date.",
+  "packageName": "@matfsw/docusaurus-plantuml-plugin",
+  "githubRepository": "matf/docusaurus-plantuml-plugin",
+  "pluginId": "plantuml-client",
+  "securityContact": "security@example.com",
+  "license": "MIT",
+  "description": "Render PlantUML diagrams in Docusaurus 3 entirely in the browser - no Java, no PlantUML server, no CDN."
+}
