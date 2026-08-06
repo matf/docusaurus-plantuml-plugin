@@ -10,6 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+import {parsePackResult} from './lib/pack-output.mjs';
+
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
@@ -72,52 +74,7 @@ try {
   process.exit(1);
 }
 
-/**
- * Reads the pack result, tolerating both the shapes npm has used and any notices printed
- * around the payload.
- *
- * npm 11 emits an array of results. Newer npm emits an object keyed by package name. Pinning
- * to one shape breaks the moment CI and a developer's machine disagree about the npm version,
- * which is exactly what happened here — the publish workflow installs `npm@latest`.
- */
-function parsePackOutput(output) {
-  const firstBrace = output.search(/[[{]/);
-  if (firstBrace === -1) {
-    console.error('Found no JSON in `npm pack --json` output:\n', output);
-    process.exit(1);
-  }
-
-  // Trailing notices are possible too, so shrink from the end until it parses.
-  const candidate = output.slice(firstBrace);
-  let parsed;
-  for (let end = candidate.length; end > 0; end -= 1) {
-    const closer = candidate.lastIndexOf('}', end - 1);
-    const bracket = candidate.lastIndexOf(']', end - 1);
-    const cut = Math.max(closer, bracket);
-    if (cut === -1) break;
-    try {
-      parsed = JSON.parse(candidate.slice(0, cut + 1));
-      break;
-    } catch {
-      end = cut;
-    }
-  }
-
-  if (parsed === undefined) {
-    console.error('Could not parse `npm pack --json` output:\n', output);
-    process.exit(1);
-  }
-
-  const results = Array.isArray(parsed) ? parsed : Object.values(parsed);
-  const first = results[0];
-  if (!first || !Array.isArray(first.files)) {
-    console.error('`npm pack --json` returned no file list:\n', JSON.stringify(parsed, null, 2));
-    process.exit(1);
-  }
-  return first;
-}
-
-const result = parsePackOutput(packOutput);
+const result = parsePackResult(packOutput);
 const files = result.files.map((file) => ({path: file.path, size: file.size}));
 const problems = [];
 

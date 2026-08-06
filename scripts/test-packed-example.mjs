@@ -14,6 +14,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+import {parsePackResult} from './lib/pack-output.mjs';
+
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const exampleDir = path.join(root, 'examples', 'docusaurus');
@@ -127,8 +129,11 @@ async function main() {
   }
 
   step('Packing the package');
-  const packJson = execFileSync('npm', ['pack', '--json'], {cwd: root, encoding: 'utf8'});
-  const tarballName = JSON.parse(packJson.slice(packJson.indexOf('[')))[0].filename;
+  const packJson = execFileSync('npm', ['pack', '--json', '--silent'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  const tarballName = parsePackResult(packJson).filename;
   const tarballPath = path.join(root, tarballName);
   if (!fs.existsSync(tarballPath)) {
     throw new Error(`npm pack reported ${tarballName} but the file is missing`);
