@@ -7,6 +7,7 @@ Two decisions large enough to deserve their own record live in `docs/adr/`:
 
 - [ADR 0001 — Wrap `@theme-init/`, not `@theme-original/`](adr/0001-theme-init-alias.md)
 - [ADR 0002 — Use `renderToString`, not the DOM `render()` API](adr/0002-render-to-string.md)
+- [ADR 0003 — Zoom by transforming a wrapper, not the SVG](adr/0003-zoom-container-transform.md)
 
 ## Overview
 
@@ -266,6 +267,58 @@ colour-blindness and forced-colours mode.
 A `<noscript>` block carries the escaped source for readers without JavaScript. It is written
 with `dangerouslySetInnerHTML` because browsers expose a `<noscript>` body as inert text
 rather than as elements, which React cannot hydrate.
+
+There are two ready-state shapes. With `zoom: false` the `role="img"` container is a direct
+child of the `<figure>` — byte-identical to what `0.1.0` produced. With zoom enabled it is
+wrapped by a viewport and a transform layer, with the control group as a sibling. In both
+shapes `div[role="img"] > svg` holds, which is what keeps the selector stable for tests and for
+author CSS.
+
+## Zoom and pan
+
+`runtime/` owns rendering; zooming lives entirely in the theme layer, split into
+`PlantUmlDiagram/zoomMath.ts` (pure geometry) and `PlantUmlDiagram/useZoomPan.ts` (all DOM
+interaction). See [ADR 0003](adr/0003-zoom-container-transform.md) for the reasoning; what
+follows is how it behaves.
+
+**The transform goes on a wrapper, never on the SVG.** `.canvas svg {max-width: 100%; height:
+auto}` derives the SVG's laid-out height from its `viewBox` ratio, so mutating `viewBox` would
+reflow the document on every wheel tick. CSS transforms do not participate in layout, so the
+figure's height is identical at 800% and at 100%. An end-to-end test asserts exactly that.
+
+**No React state.** The transform lives in a ref and is written straight to
+`layer.style.transform`, `viewport.dataset.plantumlZoom` and the readout's `textContent`. The
+hook calls `setState` zero times, so panning never re-renders — and "no state update after
+unmount" holds structurally rather than by guard. Only `pointermove` is rAF-coalesced; wheel,
+buttons, keys and resize write synchronously.
+
+**Measurement uses layout boxes.** `layer.offsetWidth`/`offsetHeight` and
+`viewport.clientWidth`/`clientHeight`, never `getBoundingClientRect()` — the layer's rect
+_includes_ the transform about to be changed, which would feed back into the next measurement.
+(The same trap catches tests: Playwright's `locator.boundingBox()` is clipped by the
+`overflow: clip` viewport, so the e2e suite measures with in-page `getBoundingClientRect()`.)
+
+**One effect owns every listener**, and its cleanup removes all of them:
+
+| Registered on the viewport                                                       | Removed by              |
+| -------------------------------------------------------------------------------- | ----------------------- |
+| `wheel` (`{passive: false}`)                                                     | `removeEventListener`   |
+| `pointerdown`, `pointermove`, `pointerup`, `pointercancel`, `lostpointercapture` | `removeEventListener`   |
+| `click` (capture phase, to swallow the click that ends a drag)                   | `removeEventListener`   |
+| `fullscreenchange` on `document`                                                 | `removeEventListener`   |
+| `ResizeObserver` on the viewport                                                 | `disconnect()`          |
+| pending `requestAnimationFrame`                                                  | `cancelAnimationFrame`  |
+| active pointer capture                                                           | `releasePointerCapture` |
+
+The `wheel` listener has to be registered imperatively with `{passive: false}`: React attaches
+its JSX `onWheel` prop passively at the root, so `preventDefault()` from there is a silent
+no-op. Key handlers do use the JSX prop, because React key events are not passive.
+
+**Both reset triggers are necessary.** The view resets when the diagram source or the colour
+mode changes. One reset runs when the listener effect re-arms (the layer node was replaced),
+and a second runs directly off the reset key — because a cache hit resolves _before_ any phase
+is reported, so toggling light → dark → light takes the component `ready → ready` in a
+microtask without ever unmounting the layer. A reset keyed only on node identity would miss it.
 
 ## Known limitations
 

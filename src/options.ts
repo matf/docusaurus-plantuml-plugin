@@ -28,6 +28,11 @@ export interface PlantUmlPluginOptions {
   renderTimeoutMs?: number;
   /** Maximum number of cached SVG entries kept per browsing session. */
   cacheMaxEntries?: number;
+  /**
+   * Let readers zoom and pan rendered diagrams, with a small control toolbar.
+   * Override for a single fence with `zoom` or `zoom=false` in its metastring.
+   */
+  zoom?: boolean;
   /** Docusaurus plugin instance id, used when the plugin is registered more than once. */
   id?: string;
 }
@@ -47,6 +52,7 @@ export const DEFAULT_OPTIONS: ResolvedPlantUmlOptions = {
   showSourceOnError: true,
   renderTimeoutMs: 20_000,
   cacheMaxEntries: 50,
+  zoom: true,
 };
 
 const CACHE_MODES: readonly CacheMode[] = ['none', 'memory', 'session'];
@@ -154,6 +160,7 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
     'showSourceOnError',
     'renderTimeoutMs',
     'cacheMaxEntries',
+    'zoom',
     // Docusaurus injects `id` for multi-instance plugins.
     'id',
   ]);
@@ -192,5 +199,6 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
     ),
     renderTimeoutMs: validateRenderTimeout(rawOptions.renderTimeoutMs),
     cacheMaxEntries: validateCacheMaxEntries(rawOptions.cacheMaxEntries),
+    zoom: validateBoolean(rawOptions.zoom, 'zoom', DEFAULT_OPTIONS.zoom),
   };
 }

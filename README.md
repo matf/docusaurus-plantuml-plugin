@@ -3,6 +3,9 @@
 Render PlantUML diagrams in Docusaurus 3 entirely in the browser — no Java, no PlantUML
 server, no Kroki, no CDN.
 
+**→ [Live demo](https://matf.github.io/docusaurus-plantuml-demo)** — every diagram on that site
+is rendered by your own browser.
+
 Write a `plantuml` fence in any `.md` or `.mdx` file and the code block is replaced, in the
 reader's browser, with an SVG rendered by the official [`@plantuml/core`][plantuml-core]
 package:
@@ -28,9 +31,13 @@ the engine itself is served from your own site's `baseUrl`.
 
 ## Status and compatibility
 
-Status: **beta**. The public surface (plugin options, `data-*` attributes, fence syntax) is
-stable enough to build on, but this is a `0.x` release and breaking changes will happen in
-minor versions until `1.0.0`.
+Status: **stable**. `1.0.0` fixes the public surface — plugin options, fence metadata flags,
+the `data-*` attributes, and the shape of the rendered markup. Breaking changes to any of them
+require a major version.
+
+Explicitly **not** covered by that promise: the generated CSS-module class names, the exact SVG
+`@plantuml/core` produces, and the renderer, queue and cache internals — which is why none of
+them are exported.
 
 | Requirement     | Supported                                                                              |
 | --------------- | -------------------------------------------------------------------------------------- |
@@ -204,6 +211,7 @@ props untouched. Existing code-block behaviour (highlighting, line numbers, titl
 | `showSourceOnError` | `boolean`                         | `true`                 | Include the diagram source in a `<details>` block on the error panel.                                                      |
 | `renderTimeoutMs`   | `number`                          | `20000`                | Abort a single render (and the runtime load) after this many milliseconds. Integer, `100`–`600000`.                        |
 | `cacheMaxEntries`   | `number`                          | `50`                   | Upper bound on cached SVG entries. Positive integer.                                                                       |
+| `zoom`              | `boolean`                         | `true`                 | Let readers zoom and pan diagrams. Adds a control toolbar and a focusable viewport. Override per fence with `zoom=false`.  |
 | `id`                | `string`                          | `'default'`            | Docusaurus plugin instance id; only relevant if you register the plugin more than once.                                    |
 
 Options are validated during the Docusaurus configuration phase, before anything is built.
@@ -213,7 +221,7 @@ would otherwise silently disable the option you meant to set:
 ```text
 [docusaurus-plugin-plantuml-client] Unknown option 'sanitiseSvg'. Supported options:
 'languages', 'theme', 'lazy', 'cache', 'sanitizeSvg', 'showSourceOnError',
-'renderTimeoutMs', 'cacheMaxEntries'.
+'renderTimeoutMs', 'cacheMaxEntries', 'zoom'.
 ```
 
 `PlantUmlPluginOptions`, `ResolvedPlantUmlOptions`, `CacheMode`, `DiagramTheme`,
@@ -234,6 +242,76 @@ Set `theme: 'light'` or `theme: 'dark'` to pin the diagram palette independently
 theme.
 
 The current mode is exposed on the wrapper as `data-plantuml-theme="light|dark"`.
+
+## Zoom and pan
+
+Large diagrams are unreadable at column width. Rendered diagrams are therefore zoomable and
+pannable by default, with a small control toolbar in the top-right corner.
+
+### Interaction
+
+| Input                               | What happens                         |
+| ----------------------------------- | ------------------------------------ |
+| Plain scroll wheel                  | Scrolls the page. Never intercepted. |
+| **Ctrl** + wheel, or trackpad pinch | Zooms about the pointer              |
+| Drag                                | Pans, once zoomed in                 |
+| One finger on a touchscreen         | Scrolls the page                     |
+| Two-finger pinch on a touchscreen   | The browser's own page zoom          |
+| Toolbar buttons                     | Zoom out, zoom in, reset, fullscreen |
+
+`Cmd` + wheel is deliberately **not** intercepted: on macOS that is the browser's own page
+zoom, and taking it over would fight the platform.
+
+### Keyboard
+
+The diagram viewport is focusable. Once focused:
+
+| Key                | Action                      |
+| ------------------ | --------------------------- |
+| `+` or `=`         | Zoom in                     |
+| `-` or `_`         | Zoom out                    |
+| `0`                | Reset to 100%               |
+| Arrow keys         | Pan                         |
+| Shift + arrow keys | Pan by most of the viewport |
+
+Keys with Ctrl, Cmd or Alt held are left to the browser, so shortcuts such as Ctrl + 0 keep
+working, and `Tab` always moves on — the diagram is never a keyboard trap.
+
+Scale is limited to 0.25×–8×, and the view resets to 100% whenever the diagram source or the
+site colour mode changes.
+
+### Turning it off
+
+Globally:
+
+```ts
+['@matfsw/docusaurus-plantuml-plugin', {zoom: false}];
+```
+
+Or for a single fence, which overrides the option either way:
+
+````markdown
+```plantuml title="Small diagram" zoom=false
+@startuml
+Alice -> Bob : Hello
+@enduml
+```
+````
+
+### Why it is on by default, and what that costs
+
+A reader who needs to zoom is rarely the author who would have enabled it, so leaving it off
+would mean most readers never discover it. The costs are real and worth knowing:
+
+- Each zoomable diagram adds roughly **four keyboard tab stops** (the viewport and three or
+  four buttons). On a page with six diagrams that is a meaningful amount of tabbing.
+- The rendered markup gains a viewport and transform wrapper around the `role="img"` container.
+  Site CSS that targets `[data-plantuml-diagram] > div[role="img"]` as a **direct child** needs
+  updating — see [Accessibility](#accessibility) for both shapes.
+- Each diagram costs one non-passive `wheel` listener and one `ResizeObserver`, and only in the
+  `ready` state.
+
+Setting `zoom: false` restores the previous markup exactly.
 
 ## Lazy loading
 
@@ -278,7 +356,7 @@ in-memory cache for the rest of the session. A storage failure never breaks rend
 
 ## Accessibility
 
-Each diagram renders as:
+With `zoom: false`, a diagram renders as:
 
 ```html
 <figure
@@ -293,6 +371,32 @@ Each diagram renders as:
 </figure>
 ```
 
+With zoom enabled (the default), the same `role="img"` element is wrapped by a viewport and a
+transform layer, and a control group is added beside it:
+
+```html
+<figure
+  data-plantuml-diagram="plantuml"
+  data-plantuml-status="ready"
+  data-plantuml-theme="light"
+  data-plantuml-interactive="true"
+>
+  <div class="stage">
+    <div class="viewport" tabindex="0" aria-describedby="…" data-plantuml-zoom="1">
+      <div class="layer">
+        <div role="img" aria-label="Authentication sequence"><svg>…</svg></div>
+      </div>
+    </div>
+    <div role="group" aria-label="Authentication sequence zoom controls">…buttons…</div>
+  </div>
+  <p class="visuallyHidden" id="…">Zoomable diagram. Use the zoom controls, …</p>
+  <figcaption>Authentication sequence</figcaption>
+  <noscript><pre>@startuml …</pre></noscript>
+</figure>
+```
+
+`div[role="img"] > svg` holds in both shapes, so a selector written against it keeps working.
+
 - The fence `title="..."` becomes the `<figcaption>` and the `aria-label`. Without a title,
   the accessible label falls back to **`PlantUML diagram`**.
 - Progress is conveyed with `aria-busy` on the `<figure>`, deliberately **not** with an
@@ -303,18 +407,31 @@ Each diagram renders as:
   a ⚠ glyph in addition to the danger colouring, so it survives colour-blindness and
   forced-colours mode.
 - Readers without JavaScript get the diagram source in a `<noscript>` block.
-- The spinner animation is disabled under `prefers-reduced-motion: reduce`.
+- The spinner animation is disabled under `prefers-reduced-motion: reduce`, as is the easing of
+  discrete zoom steps. Dragging and wheel zooming stay instantaneous either way, because direct
+  manipulation is not decoration.
+- Zoom controls live **outside** the `role="img"` element. That role makes its whole subtree
+  opaque to assistive technology, so a button placed inside would be invisible to screen-reader
+  users.
+- The control group is `role="group"`, not `role="toolbar"`: the toolbar role obliges arrow-key
+  navigation between its buttons, and the arrow keys already pan the diagram.
+- Button labels are static and the zoom percentage is `aria-hidden`. A live percentage would
+  announce on every wheel tick.
+- Keyboard instructions are attached to the viewport with `aria-describedby` rather than being
+  announced on focus repeatedly.
 
 ### `data-*` contract
 
 These attributes are part of the public surface; write your own end-to-end tests against
 them.
 
-| Attribute               | Values                                                     |
-| ----------------------- | ---------------------------------------------------------- |
-| `data-plantuml-diagram` | the fence language that matched, e.g. `plantuml` or `puml` |
-| `data-plantuml-status`  | `idle` \| `loading` \| `rendering` \| `ready` \| `error`   |
-| `data-plantuml-theme`   | `light` \| `dark`                                          |
+| Attribute                   | Values                                                     |
+| --------------------------- | ---------------------------------------------------------- |
+| `data-plantuml-diagram`     | the fence language that matched, e.g. `plantuml` or `puml` |
+| `data-plantuml-status`      | `idle` \| `loading` \| `rendering` \| `ready` \| `error`   |
+| `data-plantuml-theme`       | `light` \| `dark`                                          |
+| `data-plantuml-interactive` | `true`, on the `<figure>`, only when zoom is enabled       |
+| `data-plantuml-zoom`        | current scale on the viewport, e.g. `1`, `2.5`             |
 
 ## SVG sanitization and security model
 
@@ -408,6 +525,11 @@ The runtime requires:
 - `MutationObserver`
 - `IntersectionObserver` — optional; a graceful fallback renders immediately when it is absent
 - `sessionStorage` — optional; only for `cache: 'session'`, which degrades to memory without it
+- Pointer Events — required for drag-to-pan when `zoom` is enabled
+- `ResizeObserver` — optional; without it zoom still works, but the view is not re-clamped when
+  the column is resized
+- `Element.requestFullscreen()` — optional; the fullscreen button is simply not rendered where
+  it is unavailable, which includes iOS Safari
 
 That is modern evergreen Chrome, Edge, Firefox and Safari. Internet Explorer is not
 supported and will not be.
@@ -525,7 +647,10 @@ Four layers, all deterministic and none of them calling an external PlantUML ser
    retry, FIFO queue ordering, queue continuation after failure, timeouts, unmount during
    render, light/dark cache separation, memory cache eviction, `sessionStorage` failure and
    corruption handling, SVG sanitization against synthetic malicious input, the loading/ready/
-   error UI, SSR without browser globals, and the `IntersectionObserver` fallback.
+   error UI, SSR without browser globals, the `IntersectionObserver` fallback, and the zoom
+   layer: focal-point and clamping geometry as pure functions, the wheel policy (plain wheel
+   ignored, Ctrl honoured, Cmd ignored), keyboard handling, both reset triggers, and listener
+   teardown.
    Docusaurus `@theme/*` and `@docusaurus/*` aliases only exist inside a real Docusaurus
    webpack build, so the Vitest config points them at local stubs.
 2. **Package verification** (`npm run pack:check`). Runs `npm pack --dry-run --json`, prints
@@ -537,7 +662,11 @@ Four layers, all deterministic and none of them calling an external PlantUML ser
    fixture in a temporary directory, runs a full `docusaurus build`, and serves it. This is
    what proves the package works as consumers actually install it.
 4. **Browser end-to-end** (`npm run test:e2e`, Playwright against the served production
-   build). Asserts that real `<svg>` elements appear inside the expected container with the
+   build). Asserts that zooming magnifies the diagram without changing the figure's height,
+   that a plain wheel scrolls the page while Ctrl + wheel zooms without scrolling, that the
+   focal point stays under the cursor, that panning is clamped so an edge never comes inside
+   the viewport, and that `touch-action` stays `pan-y pinch-zoom`. It also asserts that real
+   `<svg>` elements appear inside the expected container with the
    expected diagram labels, that multiple diagrams render on one page, that `.md` and `.mdx`
    both work, that ordinary code blocks are untouched, that an invalid diagram produces the
    documented error state, that toggling dark mode re-renders, that client-side navigation
@@ -639,6 +768,14 @@ package.
   8 MB download is subject to the same budget as a render.
 - **Consuming the plugin through a `file:` link needs a webpack tweak.** See the entry in
   Troubleshooting below.
+- **No pinch-to-zoom of the diagram itself on touchscreens.** Two-finger pinch is deliberately
+  left to the browser's own page zoom, so a full-width diagram can never become a scroll trap
+  and page zoom is never taken away. Trackpad pinch on a laptop does zoom the diagram, because
+  the browser reports it as Ctrl + wheel.
+- **Zoom state is not persisted.** Navigating away and back, or switching colour mode, returns
+  the diagram to 100%.
+- **No fullscreen on iOS Safari.** It does not implement `Element.requestFullscreen()`, so the
+  button is not shown there.
 
 ## Troubleshooting
 

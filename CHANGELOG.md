@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0]
+
+First stable release. The public surface — plugin options, fence metadata flags, the `data-*`
+attributes and the shape of the rendered markup — is now covered by semantic versioning.
+
+### Added
+
+- Zoom and pan for rendered diagrams: Ctrl + wheel (and trackpad pinch) zooms about the
+  pointer, dragging pans, and a `role="group"` control toolbar offers zoom out, zoom in, reset
+  and — where the browser supports it — fullscreen.
+- Keyboard operation on a focusable viewport: `+`/`=`, `-`/`_`, `0`, arrow keys, and
+  Shift + arrows to pan by most of the viewport. Modified keys are left to the browser, and
+  `Tab` always escapes.
+- `zoom` plugin option (default `true`) and a per-fence `zoom` / `zoom=false` metastring flag
+  that overrides it for a single diagram.
+- `data-plantuml-interactive` on the figure and `data-plantuml-zoom` on the viewport.
+- `parseBooleanMeta()` for reading boolean flags from a fence metastring.
+
+### Changed
+
+- **Breaking: the rendered markup changed for zoomable diagrams.** With `zoom` enabled — the
+  default — the `role="img"` container is wrapped by a viewport and a transform layer, and a
+  control group is added beside it. Site CSS that targeted
+  `[data-plantuml-diagram] > div[role="img"]` as a **direct child** must be updated;
+  `div[role="img"] > svg` still holds. Setting `zoom: false` restores the `0.1.0` markup
+  exactly.
+- **Breaking: zoomable diagrams add keyboard tab stops.** A zoomable diagram contributes about
+  four (the viewport and its buttons).
+- Plain scrolling over a diagram is unaffected: only Ctrl + wheel zooms, and on touchscreens
+  one finger still scrolls the page and two-finger pinch is still the browser's own page zoom.
+
+### Fixed
+
+- `configureWebpack` no longer throws on Docusaurus `3.5.x`, where `currentBundler` does not
+  exist. That release line is now covered by the CI compatibility matrix.
+
 ## [0.1.0]
 
 Initial release.
@@ -29,5 +65,6 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/matf/docusaurus-plantuml-plugin/releases/tag/v0.1.0
