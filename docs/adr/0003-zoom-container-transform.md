@@ -109,9 +109,12 @@ in documentation, and the reader who needs zoom is rarely the author who would e
 - Every diagram costs about four extra tab stops. Mitigated by the toolbar existing only in the
   `ready` state, and by `zoom=false` removing it entirely for a given fence.
 - Two new `data-*` attributes are part of the public contract: `data-plantuml-interactive` on
-  the figure, `data-plantuml-zoom` on the viewport. The scale attribute deliberately lives on
-  the viewport rather than the figure so that imperative writes can never race React's
-  attribute diffing.
+  the figure, `data-plantuml-zoom` on the viewport. React renders the initial `"1"` so the
+  element is findable by that attribute from the first paint — it is the selector tests and
+  author CSS use — and the hook owns the value thereafter. React does not rewrite an unchanged
+  attribute, so the two do not fight. Keeping the attribute on the viewport rather than the
+  figure also keeps it off the element whose other attributes React updates on every state
+  change.
 - The view resets on both a source change and a colour-mode change. Both triggers are needed:
   a cache hit resolves before any phase is reported, so toggling light → dark → light takes the
   component `ready → ready` in a microtask **without unmounting the layer**, and a reset keyed

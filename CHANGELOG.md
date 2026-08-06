@@ -29,8 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resets of the zoom view now have exactly one owner. The listener effect also reset on every
+  re-attach, duplicating the effect keyed on the rendered picture; any re-attach for an
+  unrelated reason would have silently discarded a zoom the reader had chosen.
 - A unit test built a fake React element from its internal `$$typeof` symbol, which React 19
   renamed. It now uses a real element, so it no longer depends on React internals.
+- The maximize round-trip test no longer assumes effect flush order, which made it flaky on
+  CI. It asserts the same value, so a genuinely wrong transform still fails.
 
 ## [1.0.2]
 
