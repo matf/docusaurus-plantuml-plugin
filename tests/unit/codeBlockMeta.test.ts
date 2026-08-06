@@ -1,3 +1,4 @@
+import {createElement} from 'react';
 import {describe, expect, it} from 'vitest';
 
 import {
@@ -73,9 +74,12 @@ describe('fence source extraction', () => {
   });
 
   it('returns null when the body contains React elements rather than plain text', () => {
-    const element = {type: 'span', props: {}, key: null, $$typeof: Symbol.for('react.element')};
-    expect(extractSource([element as never])).toBeNull();
-    expect(extractSource(['@startuml', element as never])).toBeNull();
+    // A real element, not a hand-built object: React 19 renamed the internal element symbol
+    // from `react.element` to `react.transitional.element`, and a faked one stops being
+    // recognised — a brittleness in the test, not in the code under test.
+    const element = createElement('span', null, 'x');
+    expect(extractSource([element])).toBeNull();
+    expect(extractSource(['@startuml', element])).toBeNull();
   });
 });
 
