@@ -5,19 +5,27 @@ import {useColorMode} from '@docusaurus/theme-common';
 import {DATA_ATTR} from '../../constants.js';
 import {getSharedCache} from '../../runtime/cache.js';
 import {PlantUmlError} from '../../runtime/errors.js';
+import {renderGraphvizDiagram} from '../../runtime/graphvizRenderer.js';
 import {renderDiagram} from '../../runtime/renderer.js';
-import type {DiagramStatus} from '../../runtime/types.js';
+import type {DiagramEngine, DiagramStatus} from '../../runtime/types.js';
 import {usePlantUmlConfig} from '../usePlantUmlConfig.js';
 import {useZoomPan} from './useZoomPan.js';
 import styles from './styles.module.css';
 
 export interface PlantUmlDiagramProps {
-  /** Raw PlantUML source, exactly as authored between the fence markers. */
+  /** Raw diagram source, exactly as authored between the fence markers. */
   source: string;
   /** `title="..."` from the fence metastring; used as caption and accessible label. */
   title?: string;
-  /** The fence language that matched, e.g. `plantuml` or `puml`. */
+  /** The fence language that matched, e.g. `plantuml`, `puml`, `dot`. */
   language?: string;
+  /** Which engine renders this fence. Defaults to `plantuml`. */
+  engine?: DiagramEngine;
+  /**
+   * Graphviz layout engine from the fence metastring (`engine=neato`). Ignored for PlantUML,
+   * and ignored entirely when `graphviz.allowEngineOverride` is off.
+   */
+  layout?: string;
   /**
    * Overrides the `zoom` plugin option for this diagram. `undefined` follows the option.
    * Set from the fence metastring: `zoom` or `zoom=false`.
@@ -25,7 +33,14 @@ export interface PlantUmlDiagramProps {
   zoom?: boolean;
 }
 
-const DEFAULT_LABEL = 'PlantUML diagram';
+/**
+ * Human-readable engine names, used in labels, progress text and error headings so that a
+ * reader is told which engine is involved rather than being shown a generic failure.
+ */
+const ENGINE_LABEL: Record<DiagramEngine, string> = {
+  plantuml: 'PlantUML',
+  graphviz: 'Graphviz',
+};
 
 /** Margin large enough that a diagram is usually ready by the time it is scrolled into view. */
 const LAZY_ROOT_MARGIN = '300px';
@@ -53,7 +68,11 @@ function messageFor(error: unknown): string {
 }
 
 /**
- * Renders one PlantUML diagram in the browser.
+ * Renders one diagram in the browser, with either engine.
+ *
+ * The component is deliberately engine-agnostic: its job is states, ARIA, zoom and error
+ * presentation, none of which differs between PlantUML and Graphviz. Only the render call and
+ * the wording around it branch. (The name is historical — it predates Graphviz support.)
  *
  * Nothing happens during server-side rendering: the markup emitted on the server is the
  * same deferred placeholder the client renders first, so hydration never mismatches.
@@ -62,6 +81,8 @@ export default function PlantUmlDiagram({
   source,
   title,
   language,
+  engine = 'plantuml',
+  layout,
   zoom: zoomProp,
 }: PlantUmlDiagramProps): ReactNode {
   const config = usePlantUmlConfig();
@@ -72,6 +93,17 @@ export default function PlantUmlDiagram({
   const themeOption = config?.options.theme ?? 'auto';
   const dark = themeOption === 'auto' ? colorMode === 'dark' : themeOption === 'dark';
   const lazy = config?.options.lazy ?? true;
+  const engineName = ENGINE_LABEL[engine];
+
+  const graphvizOptions = config?.options.graphviz;
+  // A fence may only pick a layout engine when the site allows it; otherwise the configured
+  // default wins silently, exactly as it would if the fence had said nothing.
+  const resolvedLayout =
+    (graphvizOptions?.allowEngineOverride ? layout : undefined) ?? graphvizOptions?.engine ?? 'dot';
+
+  // Graphviz output does not depend on the colour mode — it adapts through CSS instead — so a
+  // colour-mode toggle must not re-run the render effect for a DOT diagram.
+  const renderDark = engine === 'graphviz' ? false : dark;
 
   // A fence flag wins over the plugin option, which in turn wins over the built-in default.
   const interactive = zoomProp ?? config?.options.zoom ?? true;
@@ -82,7 +114,10 @@ export default function PlantUmlDiagram({
   // Called unconditionally, as hooks must be; it attaches nothing when not interactive.
   const zoom = useZoomPan({
     enabled: interactive && state.status === 'ready',
-    resetKey: `${source}|${dark ? 'dark' : 'light'}`,
+    // Keyed on what can change the picture. `renderDark`, not `dark`: a Graphviz diagram is
+    // not re-rendered on a colour-mode toggle, so resetting the reader's zoom would be a
+    // gratuitous jump.
+    resetKey: `${source}|${engine}|${resolvedLayout}|${renderDark ? 'dark' : 'light'}`,
   });
 
   useEffect(() => {
@@ -117,7 +152,7 @@ export default function PlantUmlDiagram({
         status: 'error',
         svg: null,
         error:
-          'PlantUML plugin data is missing. Add the plugin to the `plugins` array in your ' +
+          'Diagram plugin data is missing. Add the plugin to the `plugins` array in your ' +
           'Docusaurus configuration and restart the build.',
       });
       return undefined;
@@ -140,17 +175,28 @@ export default function PlantUmlDiagram({
       );
     };
 
-    void renderDiagram({
+    const shared = {
       source,
-      dark,
       sanitize: options.sanitizeSvg,
       timeoutMs: options.renderTimeoutMs,
       assetsBaseUrl: config.assetsBaseUrl,
       coreVersion: config.coreVersion,
       cache: getSharedCache(options.cache, options.cacheMaxEntries),
       signal: controller.signal,
-      onPhase: (phase) => commit({status: phase, svg: null, error: null}),
-    })
+      onPhase: (phase: 'loading' | 'rendering') => commit({status: phase, svg: null, error: null}),
+    };
+
+    const pending =
+      engine === 'graphviz'
+        ? renderGraphvizDiagram({
+            ...shared,
+            layout: resolvedLayout,
+            transparentBackground: options.graphviz.transparentBackground,
+            maxSourceBytes: options.graphviz.maxSourceBytes,
+          })
+        : renderDiagram({...shared, dark: renderDark});
+
+    void pending
       .then((svg) => commit({status: 'ready', svg, error: null}))
       .catch((error: unknown) => {
         if (error instanceof PlantUmlError && error.kind === 'aborted') return;
@@ -163,7 +209,9 @@ export default function PlantUmlDiagram({
   }, [
     inView,
     source,
-    dark,
+    renderDark,
+    engine,
+    resolvedLayout,
     config,
     config?.assetsBaseUrl,
     config?.coreVersion,
@@ -171,9 +219,11 @@ export default function PlantUmlDiagram({
     config?.options.renderTimeoutMs,
     config?.options.cache,
     config?.options.cacheMaxEntries,
+    config?.options.graphviz.transparentBackground,
+    config?.options.graphviz.maxSourceBytes,
   ]);
 
-  const label = title ?? DEFAULT_LABEL;
+  const label = title ?? `${engineName} diagram`;
   const busy = state.status === 'loading' || state.status === 'rendering';
 
   // The sanitized SVG always lives in this element, zoomable or not, so `role="img" > svg`
@@ -194,7 +244,9 @@ export default function PlantUmlDiagram({
       className={styles.figure}
       aria-busy={busy || undefined}
       {...{
-        [DATA_ATTR.diagram]: language ?? 'plantuml',
+        [DATA_ATTR.diagram]: language ?? engine,
+        [DATA_ATTR.engine]: engine,
+        ...(engine === 'graphviz' ? {[DATA_ATTR.layout]: resolvedLayout} : {}),
         [DATA_ATTR.status]: state.status,
         [DATA_ATTR.theme]: dark ? 'dark' : 'light',
         ...(interactive ? {[DATA_ATTR.interactive]: 'true'} : {}),
@@ -289,7 +341,7 @@ export default function PlantUmlDiagram({
         <div className={styles.placeholder}>
           <span className={styles.spinner} aria-hidden="true" />
           <span>
-            {state.status === 'loading' ? 'Loading PlantUML runtime…' : null}
+            {state.status === 'loading' ? `Loading ${engineName} runtime…` : null}
             {state.status === 'rendering' ? `Rendering ${label}…` : null}
             {state.status === 'idle' ? `${label} (waiting to render)` : null}
           </span>
@@ -302,7 +354,7 @@ export default function PlantUmlDiagram({
             <span className={styles.errorIcon} aria-hidden="true">
               ⚠
             </span>
-            <span>Error: PlantUML diagram could not be rendered</span>
+            <span>Error: {engineName} diagram could not be rendered</span>
           </p>
           <pre className={styles.errorMessage}>{state.error}</pre>
           {config?.options.showSourceOnError !== false && (

@@ -15,6 +15,37 @@
 }
 
 /*
+ * Graphviz colour adaptation.
+ *
+ * Graphviz has no dark theme: it draws black on white regardless of the page. Rather than
+ * re-rendering the graph for each colour mode — which would double the cache and fight authors
+ * who set their own colours — the *defaults* are retargeted at `currentColor`, so a diagram
+ * inherits the page's text colour in both modes.
+ *
+ * The selectors are deliberately narrow. Graphviz emits `stroke="black"` / `fill="black"` for
+ * everything it colours by default, and leaves `<text>` with no fill at all; anything the DOT
+ * source colours explicitly comes out as that colour (`stroke="red"`, `fill="lightblue"`) and
+ * is therefore never matched here. Colours set in the diagram source always win.
+ *
+ * `fill="none"` is likewise untouched, which is what keeps unfilled node shapes unfilled.
+ */
+[data-diagram-engine='graphviz'] .canvas svg text:not([fill]) {
+  fill: currentColor;
+}
+
+[data-diagram-engine='graphviz'] .canvas svg [stroke='black'],
+[data-diagram-engine='graphviz'] .canvas svg [stroke='#000000'],
+[data-diagram-engine='graphviz'] .canvas svg [stroke='#000'] {
+  stroke: currentColor;
+}
+
+[data-diagram-engine='graphviz'] .canvas svg [fill='black'],
+[data-diagram-engine='graphviz'] .canvas svg [fill='#000000'],
+[data-diagram-engine='graphviz'] .canvas svg [fill='#000'] {
+  fill: currentColor;
+}
+
+/*
  * Zoom and pan.
  *
  * The transform is applied to `.layer`, never to the SVG. Transforms do not affect layout, so

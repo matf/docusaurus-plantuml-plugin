@@ -156,3 +156,58 @@ describe('SVG sanitization preserves legitimate PlantUML output', () => {
     expect(sanitizeSvgMarkup(once)).toBe(once);
   });
 });
+
+describe('graphviz hyperlinks', () => {
+  // DOT's `URL=`/`href=` node and edge attributes emit real <a> elements into the SVG, and
+  // diagram source is untrusted by this plugin's threat model. These pin the guarantee.
+  const wrap = (inner: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">${inner}</svg>`;
+
+  it('keeps an ordinary link a diagram author wrote', () => {
+    const clean = sanitizeSvgMarkup(
+      wrap('<a xlink:href="https://example.com/docs"><ellipse/></a>'),
+    );
+    expect(clean).toContain('example.com/docs');
+    expect(clean).toContain('<ellipse');
+  });
+
+  it('keeps a relative link', () => {
+    expect(sanitizeSvgMarkup(wrap('<a xlink:href="/docs/intro"><ellipse/></a>'))).toContain(
+      '/docs/intro',
+    );
+  });
+
+  it('strips a javascript: URL from xlink:href', () => {
+    const clean = sanitizeSvgMarkup(wrap('<a xlink:href="javascript:alert(1)"><ellipse/></a>'));
+    expect(clean).not.toMatch(/javascript:/i);
+  });
+
+  it('strips a javascript: URL from a plain href', () => {
+    const clean = sanitizeSvgMarkup(wrap('<a href="javascript:alert(1)"><ellipse/></a>'));
+    expect(clean).not.toMatch(/javascript:/i);
+  });
+
+  it('strips a javascript: URL obfuscated with entities and whitespace', () => {
+    const clean = sanitizeSvgMarkup(
+      wrap('<a xlink:href="  java&#115;cript:alert(1)"><ellipse/></a>'),
+    );
+    expect(clean).not.toMatch(/javascript:/i);
+  });
+
+  it('strips an event handler Graphviz would never emit', () => {
+    const clean = sanitizeSvgMarkup(wrap('<ellipse onclick="alert(1)" stroke="black"/>'));
+    expect(clean).not.toMatch(/onclick/i);
+    expect(clean).toContain('stroke="black"');
+  });
+
+  it('preserves the colour attributes the dark-mode CSS selects on', () => {
+    // The stylesheet retargets `stroke="black"`/`fill="black"` at currentColor; sanitization
+    // must not rewrite or drop those attributes or the adaptation silently stops working.
+    const clean = sanitizeSvgMarkup(
+      wrap('<polygon fill="black" stroke="black" points="0,0 1,1"/><text>a</text>'),
+    );
+    expect(clean).toContain('fill="black"');
+    expect(clean).toContain('stroke="black"');
+    expect(clean).toMatch(/<text[^>]*>a<\/text>/);
+  });
+});

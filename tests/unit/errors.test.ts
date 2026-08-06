@@ -1,6 +1,12 @@
 import {describe, expect, it} from 'vitest';
 
-import {describeEngineError, detectDiagramError, PlantUmlError} from '../../src/runtime/errors.js';
+import {
+  describeEngineError,
+  detectDiagramError,
+  formatGraphvizErrors,
+  graphvizErrorLine,
+  PlantUmlError,
+} from '../../src/runtime/errors.js';
 
 /** Builds an SVG whose <text> nodes carry the given lines, like PlantUML's error pictures. */
 function errorSvg(lines: string[]): string {
@@ -141,5 +147,70 @@ describe('PlantUmlError', () => {
   it('preserves the underlying cause', () => {
     const cause = new Error('root cause');
     expect(new PlantUmlError('load', 'wrapper', {cause}).cause).toBe(cause);
+  });
+});
+
+describe('formatGraphvizErrors', () => {
+  it('returns the engine diagnostic verbatim, line number and all', () => {
+    expect(
+      formatGraphvizErrors([{level: 'error', message: "syntax error in line 3 near '}'"}]),
+    ).toBe("syntax error in line 3 near '}'");
+  });
+
+  it('joins several diagnostics onto separate lines', () => {
+    expect(
+      formatGraphvizErrors([
+        {level: 'error', message: 'first problem'},
+        {level: 'error', message: 'second problem'},
+      ]),
+    ).toBe('first problem\nsecond problem');
+  });
+
+  it('drops warnings, which accompany successful renders', () => {
+    expect(
+      formatGraphvizErrors([
+        {level: 'warning', message: 'node size too small'},
+        {level: 'error', message: 'the real failure'},
+      ]),
+    ).toBe('the real failure');
+  });
+
+  it('falls back to warnings when a failure reported nothing else', () => {
+    // A failure with only warning-level diagnostics still failed; saying nothing would be worse.
+    expect(formatGraphvizErrors([{level: 'warning', message: 'something odd'}])).toBe(
+      'something odd',
+    );
+  });
+
+  it('de-duplicates a diagnostic Graphviz repeated', () => {
+    expect(
+      formatGraphvizErrors([
+        {level: 'error', message: 'same thing'},
+        {level: 'error', message: 'same thing'},
+      ]),
+    ).toBe('same thing');
+  });
+
+  it('describes an empty or blank diagnostic list rather than showing nothing', () => {
+    expect(formatGraphvizErrors([])).toMatch(/without reporting a reason/);
+    expect(formatGraphvizErrors([{message: '   '}])).toMatch(/without reporting a reason/);
+  });
+
+  it('handles a diagnostic with no level at all', () => {
+    expect(formatGraphvizErrors([{message: 'levelless'}])).toBe('levelless');
+  });
+});
+
+describe('graphvizErrorLine', () => {
+  it('extracts the line number Graphviz named', () => {
+    expect(graphvizErrorLine("syntax error in line 7 near '}'")).toBe(7);
+  });
+
+  it('returns null when no line is named', () => {
+    expect(graphvizErrorLine('something went wrong')).toBeNull();
+  });
+
+  it('ignores a zero line number, which is not a real source line', () => {
+    expect(graphvizErrorLine('syntax error in line 0')).toBeNull();
   });
 });

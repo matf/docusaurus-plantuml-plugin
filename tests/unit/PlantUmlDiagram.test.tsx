@@ -194,7 +194,7 @@ describe('error states', () => {
     scrollIntoView();
 
     await waitFor(() => expect(figure()).toHaveAttribute('data-plantuml-status', 'error'));
-    expect(screen.getByRole('alert')).toHaveTextContent(/PlantUML plugin data is missing/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/Diagram plugin data is missing/);
     expect(renderDiagramMock).not.toHaveBeenCalled();
   });
 

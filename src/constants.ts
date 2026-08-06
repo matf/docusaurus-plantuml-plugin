@@ -21,9 +21,20 @@ export function assetsDirForVersion(coreVersion: string): string {
 export const VIZ_SCRIPT_FILENAME = 'viz-global.js';
 export const PLANTUML_MODULE_FILENAME = 'plantuml.js';
 
-/** `data-*` attribute names, kept in one place because tests and docs depend on them. */
+/**
+ * `data-*` attribute names, kept in one place because tests and docs depend on them.
+ *
+ * The `data-plantuml-*` prefix is historical: it predates Graphviz support and is applied to
+ * every diagram this plugin renders, whatever the engine. Renaming it would break author CSS
+ * for no functional gain, so {@link DATA_ATTR.engine} was added alongside it instead —
+ * that is the attribute to select on when the two engines need different styling.
+ */
 export const DATA_ATTR = {
   diagram: 'data-plantuml-diagram',
+  /** `"plantuml"` or `"graphviz"` — which engine produced this figure. */
+  engine: 'data-diagram-engine',
+  /** Graphviz layout engine (`dot`, `neato`, …). Absent on PlantUML figures. */
+  layout: 'data-diagram-layout',
   status: 'data-plantuml-status',
   theme: 'data-plantuml-theme',
   /** `"true"` on the figure when the diagram is zoomable. */

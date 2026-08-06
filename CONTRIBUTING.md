@@ -123,12 +123,21 @@ New behaviour needs a test at the right layer:
 - **Package** (`scripts/verify-package.mjs`) — anything affecting what is published.
 - **Integration** (`scripts/test-packed-example.mjs`) — anything affecting how the package is
   consumed from a registry install.
-- **End-to-end** (`tests/e2e/`, Playwright) — anything involving the real engine, real asset
+- **End-to-end** (`tests/e2e/`, Playwright) — anything involving either real engine, real asset
   URLs, hydration or colour-mode switching. The engine contract test is what will catch an
   incompatible `@plantuml/core` upgrade.
 
+Two things worth knowing when adding to the end-to-end suite:
+
+- **Diagrams are lazily rendered.** A page taller than the viewport leaves its lower diagrams
+  `idle` until they scroll into view, so a test asserting on all of them must call
+  `revealLazyDiagrams(page)` from `tests/e2e/helpers.ts` before `waitForDiagrams`.
+- **Both engines share almost everything.** A change to the loader, cache, sanitizer, component
+  or zoom layer needs to be considered for `plantuml` _and_ `dot` fences; only the render call
+  itself differs.
+
 When a technical assumption about `@plantuml/core` or Docusaurus turns out to be false, add a
-regression test **and** record the decision in `docs/adr/`. Both existing ADRs came from
+regression test **and** record the decision in `docs/adr/`. Every existing ADR came from
 exactly that situation.
 
 ## Commits and pull requests

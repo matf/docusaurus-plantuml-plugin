@@ -4,7 +4,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import {useAllPluginInstancesData} from '@docusaurus/useGlobalData';
 
 import {PLUGIN_NAME} from '../constants.js';
-import type {ResolvedPlantUmlOptions} from '../options.js';
+import {DEFAULT_GRAPHVIZ_OPTIONS, type ResolvedPlantUmlOptions} from '../options.js';
 
 export interface PlantUmlRuntimeConfig {
   options: ResolvedPlantUmlOptions;
@@ -46,7 +46,26 @@ export function usePlantUmlConfig(): PlantUmlRuntimeConfig | null {
   // object on every render would restart the render effect on every state update, which
   // re-enters rendering forever.
   return useMemo(
-    () => (first ? {options: first.options, assetsBaseUrl, coreVersion: first.coreVersion} : null),
+    () =>
+      first
+        ? {
+            options: withGraphvizDefaults(first.options),
+            assetsBaseUrl,
+            coreVersion: first.coreVersion,
+          }
+        : null,
     [first, assetsBaseUrl],
   );
+}
+
+/**
+ * Fills in the `graphviz` group when it is missing from global data.
+ *
+ * `resolveOptions` always produces it, so this only matters for data written by an older
+ * version of the plugin — a stale `.docusaurus` cache surviving an upgrade, most plausibly.
+ * Substituting the defaults keeps such a site rendering instead of failing on a missing key.
+ */
+function withGraphvizDefaults(options: ResolvedPlantUmlOptions): ResolvedPlantUmlOptions {
+  if (options.graphviz) return options;
+  return {...options, graphviz: DEFAULT_GRAPHVIZ_OPTIONS};
 }

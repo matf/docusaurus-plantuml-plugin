@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 
 import {
   computeCacheKey,
+  computeGraphvizCacheKey,
   createDiagramCache,
   getSharedCache,
   resetSharedCaches,
@@ -186,5 +187,70 @@ describe('shared caches', () => {
     getSharedCache('memory', 50).set('a', '<svg/>');
     resetSharedCaches();
     expect(getSharedCache('memory', 50).get('a')).toBeUndefined();
+  });
+});
+
+describe('graphviz cache keys', () => {
+  const base = {
+    source: 'digraph {a -> b}',
+    layout: 'dot',
+    sanitized: true,
+    transparentBackground: true,
+    coreVersion: '1.2026.6',
+  };
+
+  it('is stable for identical input', () => {
+    expect(computeGraphvizCacheKey(base)).toBe(computeGraphvizCacheKey({...base}));
+  });
+
+  it('ignores the colour mode entirely', () => {
+    // Graphviz output adapts through CSS instead of being re-rendered, so one entry serves
+    // both colour modes. There is deliberately no `dark` field to vary.
+    expect(computeGraphvizCacheKey(base)).not.toMatch(/dark|light/);
+  });
+
+  it('separates the two layout engines', () => {
+    expect(computeGraphvizCacheKey({...base, layout: 'neato'})).not.toBe(
+      computeGraphvizCacheKey(base),
+    );
+  });
+
+  it('separates the two background settings', () => {
+    expect(computeGraphvizCacheKey({...base, transparentBackground: false})).not.toBe(
+      computeGraphvizCacheKey(base),
+    );
+  });
+
+  it('separates sanitized from raw output', () => {
+    expect(computeGraphvizCacheKey({...base, sanitized: false})).not.toBe(
+      computeGraphvizCacheKey(base),
+    );
+  });
+
+  it('invalidates every entry when the engine version changes', () => {
+    expect(computeGraphvizCacheKey({...base, coreVersion: '1.2027.1'})).not.toBe(
+      computeGraphvizCacheKey(base),
+    );
+  });
+
+  it('separates two different sources', () => {
+    expect(computeGraphvizCacheKey({...base, source: 'digraph {a -> c}'})).not.toBe(
+      computeGraphvizCacheKey(base),
+    );
+  });
+
+  it('cannot collide with a PlantUML key for the same source', () => {
+    const plantuml = computeCacheKey({
+      source: base.source,
+      dark: false,
+      sanitized: true,
+      coreVersion: base.coreVersion,
+    });
+    expect(computeGraphvizCacheKey(base)).not.toBe(plantuml);
+    expect(computeGraphvizCacheKey(base).startsWith('graphviz|')).toBe(true);
+  });
+
+  it('carries the source length alongside the hash', () => {
+    expect(computeGraphvizCacheKey(base)).toContain(`|${base.source.length}|`);
   });
 });
