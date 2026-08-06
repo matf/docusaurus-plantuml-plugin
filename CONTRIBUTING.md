@@ -82,7 +82,7 @@ anything in `src/index.ts`, `src/assets.ts`, the theme components, or the build 
 
 ## Project identity
 
-Package name, GitHub repository, plugin id and security contact live in one place:
+Package name, GitHub repository, plugin id, licence and description live in one place:
 `project.config.json`. Never edit the derived values by hand. Change the source of truth and
 run:
 

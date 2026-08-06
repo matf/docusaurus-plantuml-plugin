@@ -471,7 +471,7 @@ Clone the repository and install with `npm ci`. Node 20 or newer is required (se
 ### Renaming the package or repository
 
 Project identity lives in `project.config.json` — package name, GitHub repository, plugin id,
-security contact, licence, description. Change the one line you need and run:
+licence, description. Change the one line you need and run:
 
 ```bash
 npm run sync:meta

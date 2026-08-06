@@ -3,7 +3,6 @@
   "packageName": "@matfsw/docusaurus-plantuml-plugin",
   "githubRepository": "matf/docusaurus-plantuml-plugin",
   "pluginId": "plantuml-client",
-  "securityContact": "security@example.com",
   "license": "MIT",
   "description": "Render PlantUML diagrams in Docusaurus 3 entirely in the browser - no Java, no PlantUML server, no CDN."
 }

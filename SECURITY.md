@@ -14,24 +14,13 @@ no maintained release branches.
 
 **Please do not open a public GitHub issue for a security problem.**
 
-### Preferred: GitHub private vulnerability reporting
-
-Use GitHub's private vulnerability reporting on this repository:
+Report it through GitHub private vulnerability reporting on this repository:
 
 <https://github.com/matf/docusaurus-plantuml-plugin/security/advisories/new>
 
-This keeps the report private until a fix is available, gives us a place to collaborate on the
-patch, and handles CVE assignment if one is warranted. It is the channel we would rather you
-used.
-
-### Alternative: email
-
-> **Maintainer note — placeholder.** The address below comes from `securityContact` in
-> `project.config.json` and is currently the placeholder `security@example.com`. Replace it
-> with a real, monitored address (and run `npm run sync:meta`) before relying on this channel,
-> or delete this section and use GitHub private reporting only.
-
-`security@example.com`
+This is the only reporting channel. It keeps the report private until a fix is available,
+gives us somewhere to collaborate on the patch, and handles CVE assignment if one is
+warranted. There is deliberately no email alias to go stale or go unread.
 
 ### What to include
 
