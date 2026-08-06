@@ -314,6 +314,12 @@ The `wheel` listener has to be registered imperatively with `{passive: false}`: 
 its JSX `onWheel` prop passively at the root, so `preventDefault()` from there is a silent
 no-op. Key handlers do use the JSX prop, because React key events are not passive.
 
+**Buttons and keys anchor zoom at the viewport's top-left; the wheel anchors at the pointer.**
+`clampTransform` left-aligns content that fits, so a diagram smaller than its viewport sits at
+the origin with empty space to its right and below. Centre-anchored zoom scales that empty
+space and walks the diagram off the top and left edges. Anchoring at `(0, 0)` makes the
+translation `t' = t · ratio`, which leaves a left-aligned diagram exactly where it is.
+
 **Maximizing is an in-page overlay, not the Fullscreen API.** `requestFullscreen()` fullscreens
 the whole browser window in Firefox rather than presenting the element, and its `::backdrop` is
 outside the element, so the page showed through behind the diagram. A `position: fixed` overlay

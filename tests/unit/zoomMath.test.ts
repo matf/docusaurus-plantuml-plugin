@@ -87,6 +87,33 @@ describe('zoomAbout', () => {
     expect(zoomAbout(IDENTITY, 0.01, 0, 0, 0.5, 2).k).toBe(0.5);
   });
 
+  it('leaves a left-aligned diagram in place when anchored at the top-left', () => {
+    // What the toolbar buttons do. A diagram that fits its viewport sits at the origin, so
+    // anchoring there must grow it into the empty space to its right and below rather than
+    // pushing it off the top and left edges.
+    const anchored = zoomAbout(IDENTITY, SCALE_STEP, 0, 0);
+    expect(anchored).toEqual({k: SCALE_STEP, x: 0, y: 0});
+
+    const twice = zoomAbout(anchored, SCALE_STEP, 0, 0);
+    expect(twice.x).toBe(0);
+    expect(twice.y).toBe(0);
+  });
+
+  it('pushes a left-aligned diagram off-screen when anchored at the centre', () => {
+    // The behaviour this replaced, pinned so the regression is recognisable.
+    const centred = zoomAbout(IDENTITY, SCALE_STEP, 400, 300);
+    expect(centred.x).toBeLessThan(0);
+    expect(centred.y).toBeLessThan(0);
+  });
+
+  it('keeps the top-left of the visible area fixed when already panned', () => {
+    const panned: Transform = {k: 2, x: -300, y: -150};
+    const zoomed = zoomAbout(panned, 1.25, 0, 0);
+    // The content under viewport (0,0) is unchanged.
+    expect(unproject(zoomed, 0, 0).x).toBeCloseTo(unproject(panned, 0, 0).x, 9);
+    expect(unproject(zoomed, 0, 0).y).toBeCloseTo(unproject(panned, 0, 0).y, 9);
+  });
+
   it('returns to exactly 1 after equal zoom in and out', () => {
     const zoomedIn = zoomAbout(IDENTITY, SCALE_STEP, 100, 100);
     const back = zoomAbout(zoomedIn, 1 / SCALE_STEP, 100, 100);
