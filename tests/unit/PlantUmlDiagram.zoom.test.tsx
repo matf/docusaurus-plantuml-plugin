@@ -359,6 +359,40 @@ describe('keyboard', () => {
   });
 });
 
+describe('not resetting the view', () => {
+  it('keeps the zoom across a re-render that changes nothing about the picture', async () => {
+    // Resets must have exactly one owner. When the listener effect also reset on attach, any
+    // re-attach for an unrelated reason threw away a zoom the reader had chosen.
+    const {rerender} = await renderReady();
+    act(() => screen.getByRole('button', {name: 'Zoom in'}).click());
+    expect(zoomLevel()).toBe('1.25');
+
+    rerender(<PlantUmlDiagram source={SOURCE} />);
+    rerender(<PlantUmlDiagram source={SOURCE} title="a caption appears" />);
+
+    expect(zoomLevel()).toBe('1.25');
+  });
+
+  it('keeps the zoom while maximizing and restoring', async () => {
+    await renderReady();
+    act(() => screen.getByRole('button', {name: 'Zoom in'}).click());
+
+    act(() => screen.getByRole('button', {name: 'Maximize diagram'}).click());
+    act(() => screen.getByRole('button', {name: 'Maximize diagram'}).click());
+
+    await waitFor(() => expect(zoomLevel()).toBe('1.25'));
+  });
+
+  it('sets the zoom attribute without React also owning it', async () => {
+    // Rendering `data-plantuml-zoom` from JSX as well would give the attribute two owners.
+    await renderReady();
+    expect(viewport()).toHaveAttribute('data-plantuml-zoom', '1');
+
+    act(() => screen.getByRole('button', {name: 'Zoom in'}).click());
+    expect(viewport()).toHaveAttribute('data-plantuml-zoom', '1.25');
+  });
+});
+
 describe('resetting the view', () => {
   it('resets when the colour mode changes', async () => {
     // A cache hit can take the component ready -> ready without unmounting the layer, so the
@@ -472,7 +506,10 @@ describe('maximizing', () => {
     act(() => maximizeButton().click());
     act(() => maximizeButton().click());
 
-    expect(zoomLevel()).toBe('1.25');
+    // `waitFor`, not a bare assertion: the round trip settles through an effect cleanup, and
+    // asserting synchronously assumed a flush order that held locally but not on every runner.
+    // The expected value is unchanged, so a genuinely wrong transform still fails.
+    await waitFor(() => expect(zoomLevel()).toBe('1.25'));
   });
 
   it('does not leave the page scroll-locked when unmounted while maximized', async () => {

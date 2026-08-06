@@ -42,7 +42,7 @@ them are exported.
 | Requirement     | Supported                                                                              |
 | --------------- | -------------------------------------------------------------------------------------- |
 | Docusaurus      | `3.5.0` and later `3.x`                                                                |
-| Node.js (build) | `>= 20`                                                                                |
+| Node.js (build) | `>= 20.9.0` (the Node 20 LTS line)                                                     |
 | React           | `18.x` or `19.x` (matching your Docusaurus install)                                    |
 | Bundler         | webpack (default) and Rspack (`future.v4` / `@docusaurus/faster`)                      |
 | PlantUML engine | `@plantuml/core` `1.2026.6`                                                            |

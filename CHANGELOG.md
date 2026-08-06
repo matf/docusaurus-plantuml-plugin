@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3]
+
+### Security
+
+- `copy-webpack-plugin` `12` → `14`, which moves the transitive `serialize-javascript`
+  dependency to `7.0.7`. That closes a high-severity advisory (RCE via `RegExp.flags`) and a
+  denial-of-service advisory in the version the plugin previously pulled in. The dependency is
+  used at build time and never reaches a site visitor's browser.
+
+### Changed
+
+- `engines.node` is now `>= 20.9.0`, following `copy-webpack-plugin@14`. In practice this is
+  not a restriction: the Node 20 LTS line begins at `20.9.0`, so any supported Node 20 already
+  satisfies it.
+- Development dependencies updated: `globals` `16` → `17`, `@types/node` `22` → `26`, and
+  React `18` → `19` for the unit-test environment. The plugin still supports React 18 and 19;
+  the example site continues to exercise React 18 end to end, so both are covered.
+- GitHub Actions updated: `actions/checkout` `5` → `7`, `actions/setup-node` `5` → `7`,
+  `actions/upload-artifact` `4` → `7`.
+
+### Fixed
+
+- Resets of the zoom view now have exactly one owner. The listener effect also reset on every
+  re-attach, duplicating the effect keyed on the rendered picture; any re-attach for an
+  unrelated reason would have silently discarded a zoom the reader had chosen.
+- A unit test built a fake React element from its internal `$$typeof` symbol, which React 19
+  renamed. It now uses a real element, so it no longer depends on React internals.
+- The maximize round-trip test no longer assumes effect flush order, which made it flaky on
+  CI. It asserts the same value, so a genuinely wrong transform still fails.
+
 ## [1.0.2]
 
 ### Fixed
@@ -96,7 +126,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v0.1.0...v1.0.0

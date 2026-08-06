@@ -215,6 +215,9 @@ export default function PlantUmlDiagram({
             aria-describedby={hintId}
             aria-keyshortcuts="Plus Minus 0 ArrowUp ArrowDown ArrowLeft ArrowRight"
             onKeyDown={zoom.onKeyDown}
+            // React renders the initial value so the element is findable by this attribute from the
+            // first paint — it is the selector tests and author CSS use. The hook then owns the value.
+            // React never rewrites an unchanged attribute, so the two do not fight.
             {...{[DATA_ATTR.zoom]: '1'}}
           >
             {/*

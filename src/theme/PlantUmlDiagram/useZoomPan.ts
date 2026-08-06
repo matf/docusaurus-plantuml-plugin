@@ -188,9 +188,6 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     const viewport = viewportRef.current;
     if (!viewport) return undefined;
 
-    // The layer node is replaced whenever the rendered SVG changes; start from a clean view.
-    write(IDENTITY);
-
     let dragging = false;
     let pointerId: number | null = null;
     let startX = 0;
@@ -333,9 +330,16 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
   }, [apply, enabled, measure, resetKey, write]);
 
   /**
-   * A cache hit resolves before any phase is reported, so a colour-mode toggle can go
-   * `ready -> ready` without ever unmounting the layer. The effect above would not re-run in
-   * that case, which is why the reset is also driven directly by `resetKey`.
+   * The single owner of "reset the view".
+   *
+   * `resetKey` identifies the rendered picture, so this covers both a new diagram and a
+   * colour-mode change — including the case where a cache hit resolves before any phase is
+   * reported and the component goes `ready -> ready` without the layer ever unmounting.
+   *
+   * The listener effect deliberately does *not* also reset. Its dependencies are a superset of
+   * this one's, so any re-attach for an unrelated reason — a remount, or a callback identity
+   * change from a future refactor — would silently throw away a zoom the reader had chosen.
+   * One owner means a reset happens when the picture changes, and at no other time.
    */
   useEffect(() => {
     if (!enabled) return;
