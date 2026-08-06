@@ -172,6 +172,11 @@ jobs:
                 if (name.startsWith("@docusaurus/")) pkg[group][name] = version;
               }
             }
+            // Upstream, not us: @docusaurus/bundler pinned webpackbar ^6.0.1 until 3.10.2,
+            // and webpackbar 6 fails ProgressPlugin option validation against webpack
+            // >= 5.109. Without this override no Docusaurus 3.5-3.10.0 site can be built
+            // from a fresh install at all, with or without this plugin.
+            pkg.overrides = {...pkg.overrides, webpackbar: "^7.0.0"};
             fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
           ' "$version"
           cat examples/docusaurus/package.json

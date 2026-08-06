@@ -70,6 +70,13 @@ describe('bundler selection', () => {
     expect(plugin).toBeInstanceOf(CopyRspackPlugin);
   });
 
+  it('falls back to copy-webpack-plugin on Docusaurus 3.5.x, which has no currentBundler', () => {
+    // `currentBundler` was introduced in Docusaurus 3.6 alongside Rspack support. On the
+    // oldest supported release it is undefined, and webpack is the only bundler there.
+    const plugin = createCopyPlugin(undefined, patterns);
+    expect(plugin.constructor.name).toBe('CopyPlugin');
+  });
+
   it('fails with an actionable message when Rspack lacks its copy plugin', () => {
     expect(() => createCopyPlugin({name: 'rspack', instance: {} as never}, patterns)).toThrow(
       /CopyRspackPlugin' is unavailable/,

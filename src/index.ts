@@ -54,11 +54,17 @@ interface RspackNamespace {
   CopyRspackPlugin?: new (options: {patterns: CopyPattern[]}) => WebpackPluginInstance;
 }
 
+/**
+ * Selects the copy plugin for the bundler in use.
+ *
+ * `currentBundler` only exists from Docusaurus 3.6, where Rspack support was added. On 3.5.x
+ * it is `undefined` and webpack is the only bundler, so an absent value is not an error.
+ */
 export function createCopyPlugin(
-  currentBundler: ConfigureWebpackUtils['currentBundler'],
+  currentBundler: ConfigureWebpackUtils['currentBundler'] | undefined,
   patterns: CopyPattern[],
 ): WebpackPluginInstance {
-  if (currentBundler.name === 'rspack') {
+  if (currentBundler?.name === 'rspack') {
     const {CopyRspackPlugin} = currentBundler.instance as unknown as RspackNamespace;
     if (!CopyRspackPlugin) {
       throw new Error(
@@ -110,7 +116,8 @@ export default function plantumlPlugin(
         // These files are already minified upstream; re-processing 8 MB is wasted work.
         info: {minimized: true},
       }));
-      return {plugins: [createCopyPlugin(utils.currentBundler, patterns)]};
+      // Optional chaining, not laziness: `currentBundler` is absent on Docusaurus 3.5.x.
+      return {plugins: [createCopyPlugin(utils?.currentBundler, patterns)]};
     },
   };
 }

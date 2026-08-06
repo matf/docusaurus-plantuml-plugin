@@ -44,6 +44,37 @@ minor versions until `1.0.0`.
 The plugin requires a theme that already provides `MDXComponents/Code` — in practice
 `@docusaurus/theme-classic`, which you almost certainly have through `preset-classic`.
 
+CI runs the full browser suite against Docusaurus `3.5.2` (the oldest supported release), the
+version the example pins, and the newest `3.x` resolved at run time.
+
+### Docusaurus 3.5–3.10.0 need a `webpackbar` override
+
+This is an upstream issue that has nothing to do with this plugin, but it will stop your build
+before the plugin is ever reached, so it is worth knowing about.
+
+`@docusaurus/bundler` depended on `webpackbar@^6.0.1` up to and including Docusaurus `3.10.0`,
+and `webpackbar` 6 fails `ProgressPlugin`'s option validation against `webpack >= 5.109`. A
+fresh install of any Docusaurus `3.5`–`3.10.0` site therefore fails to build with:
+
+```text
+ValidationError: Invalid options object.
+Progress Plugin has been initialized using an options object that does not match the API schema.
+```
+
+If you are on one of those versions and see this, add an override to your **site's**
+`package.json` and reinstall:
+
+```json
+{
+  "overrides": {
+    "webpackbar": "^7.0.0"
+  }
+}
+```
+
+Docusaurus `3.10.2` and later depend on `webpackbar@^7` already and need no override. This is
+exactly what the compatibility job in CI does to test the `3.5.2` leg.
+
 ### A note on the engine's licence
 
 `@plantuml/core` is MIT-licensed **from version `1.2026.6` onwards**. Earlier versions were
@@ -667,6 +698,15 @@ Script-blocking and privacy extensions sometimes block large inline-compiled Jav
 WebAssembly compilation or worker creation. If diagrams fail for one reader but work in a
 private window with extensions disabled, that is the cause. Ask the reader to allow-list the
 site.
+
+### The build fails with "Progress Plugin ... does not match the API schema"
+
+Not this plugin. `@docusaurus/bundler` pinned `webpackbar@^6.0.1` until Docusaurus `3.10.2`,
+and that version of `webpackbar` is rejected by `webpack >= 5.109`. Any Docusaurus
+`3.5`–`3.10.0` site fails this way from a fresh install, with or without this plugin
+installed. Add `"overrides": {"webpackbar": "^7.0.0"}` to your site's `package.json` and
+reinstall, or upgrade Docusaurus to `3.10.2` or later. See
+[Status and compatibility](#docusaurus-3510-need-a-webpackbar-override).
 
 ### Duplicate or mismatched Docusaurus / React dependencies
 
