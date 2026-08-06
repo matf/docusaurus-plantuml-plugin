@@ -14,6 +14,141 @@
   height: auto;
 }
 
+/*
+ * Zoom and pan.
+ *
+ * The transform is applied to `.layer`, never to the SVG. Transforms do not affect layout, so
+ * the figure keeps the exact height it has at 100% no matter how far the reader zooms in, and
+ * `max-width: 100%` on the SVG keeps constraining the base size as it always did.
+ */
+.stage {
+  position: relative;
+}
+
+.viewport {
+  /* `clip` also prevents find-in-page from silently scrolling this box. */
+  overflow: hidden;
+  overflow: clip;
+  max-height: var(--plantuml-zoom-max-height, none);
+  /*
+   * One finger scrolls the page and two fingers are the browser's own pinch zoom, so a
+   * full-width diagram can never become a scroll trap on a phone.
+   */
+  touch-action: pan-y pinch-zoom;
+  cursor: grab;
+  outline-offset: 2px;
+}
+
+.viewport[data-plantuml-dragging='true'] {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* Inside the viewport the SVG must not be clipped by the old scroll container. */
+.viewport .canvas {
+  display: block;
+  overflow: visible;
+}
+
+.layer {
+  transform-origin: 0 0;
+  transition: transform var(--plantuml-zoom-transition, 150ms) ease-out;
+}
+
+/* Direct manipulation must never lag behind the finger, so gestures suppress the easing. */
+.layer[data-plantuml-continuous='true'] {
+  transition: none;
+}
+
+.toolbar {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.25rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-background-surface-color);
+  opacity: 0.92;
+}
+
+.toolbarButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--ifm-global-radius);
+  background: transparent;
+  color: var(--ifm-font-color-base);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.toolbarButton:hover {
+  background: var(--ifm-color-emphasis-200);
+}
+
+.toolbarButton:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 1px;
+}
+
+.readout {
+  min-width: 3.25rem;
+  padding: 0 0.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.stage:fullscreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ifm-background-color);
+}
+
+.stage:fullscreen .viewport {
+  width: 100vw;
+  height: 100dvh;
+  max-height: none;
+}
+
+/* The default backdrop is black, which makes a transparent light-mode diagram look broken. */
+.stage::backdrop {
+  background: var(--ifm-background-color, #ffffff);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (forced-colors: active) {
+  .toolbar {
+    border-color: ButtonBorder;
+  }
+
+  .toolbarButton {
+    border-color: ButtonBorder;
+    color: ButtonText;
+  }
+}
+
 .placeholder {
   display: flex;
   align-items: center;
@@ -44,6 +179,14 @@
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation: none;
+  }
+
+  /*
+   * Only the easing of discrete zoom steps is decoration. Dragging and wheel zooming are
+   * direct manipulation and stay instantaneous either way.
+   */
+  .layer {
+    --plantuml-zoom-transition: 0s;
   }
 }
 

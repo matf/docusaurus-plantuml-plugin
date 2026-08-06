@@ -6,6 +6,7 @@ import PlantUmlDiagram from '@theme/PlantUmlDiagram';
 import {
   extractLanguage,
   extractSource,
+  parseBooleanMeta,
   parseTitle,
   type CodeBlockProps,
 } from '../../codeBlockMeta.js';
@@ -37,5 +38,12 @@ export default function Code(props: CodeBlockProps): ReactNode {
     return <OriginalCode {...props} />;
   }
 
-  return <PlantUmlDiagram source={source} title={parseTitle(props)} language={language} />;
+  return (
+    <PlantUmlDiagram
+      source={source}
+      title={parseTitle(props)}
+      language={language}
+      zoom={parseBooleanMeta(props, 'zoom')}
+    />
+  );
 }

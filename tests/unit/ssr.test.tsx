@@ -69,3 +69,22 @@ describe('server-side rendering', () => {
     );
   });
 });
+
+describe('server-side rendering with zoom enabled', () => {
+  it('emits the deferred placeholder and no interactive controls', () => {
+    // Zoom is on by default, and none of its browser APIs may be touched during SSG.
+    const html = renderToString(<PlantUmlDiagram source={SOURCE} />);
+
+    expect(html).toContain('data-plantuml-status="idle"');
+    expect(html).not.toContain('<button');
+    expect(html).not.toContain('tabindex');
+    expect(html).not.toContain('data-plantuml-zoom');
+    expect(html).not.toContain('<svg');
+  });
+
+  it('renders a zoom-disabled diagram identically on the server', () => {
+    const html = renderToString(<PlantUmlDiagram source={SOURCE} zoom={false} />);
+    expect(html).toContain('data-plantuml-status="idle"');
+    expect(html).not.toContain('data-plantuml-interactive');
+  });
+});

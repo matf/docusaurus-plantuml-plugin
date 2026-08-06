@@ -14,6 +14,7 @@ describe('plugin option defaults', () => {
       showSourceOnError: true,
       renderTimeoutMs: 20_000,
       cacheMaxEntries: 50,
+      zoom: true,
     });
   });
 
@@ -35,6 +36,11 @@ describe('plugin option defaults', () => {
     expect(resolved.renderTimeoutMs).toBe(5_000);
     expect(resolved.cache).toBe('memory');
     expect(resolved.sanitizeSvg).toBe(true);
+  });
+
+  it('keeps an explicit zoom value', () => {
+    expect(resolveOptions({zoom: false}).zoom).toBe(false);
+    expect(resolveOptions({zoom: true}).zoom).toBe(true);
   });
 
   it('normalizes languages to lower case and trims them', () => {
@@ -64,6 +70,7 @@ describe('plugin option validation', () => {
     ['a timeout below the minimum', {renderTimeoutMs: 10}, /must be between 100 and 600000/],
     ['a timeout above the maximum', {renderTimeoutMs: 900_000}, /must be between 100 and 600000/],
     ['a zero cache limit', {cacheMaxEntries: 0}, /must be a positive integer/],
+    ['a non-boolean zoom', {zoom: 'yes'}, /options\.zoom must be a boolean/],
   ];
 
   it.each(invalidCases)('rejects %s', (_name, options, expectedMessage) => {

@@ -27,6 +27,7 @@ declare module '@theme/PlantUmlDiagram' {
     source: string;
     title?: string;
     language?: string;
+    zoom?: boolean;
   }
 
   const PlantUmlDiagram: ComponentType<Props>;

@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState, type ReactNode} from 'react';
+import {useEffect, useId, useRef, useState, type ReactNode} from 'react';
 
 import {useColorMode} from '@docusaurus/theme-common';
 
@@ -8,6 +8,7 @@ import {PlantUmlError} from '../../runtime/errors.js';
 import {renderDiagram} from '../../runtime/renderer.js';
 import type {DiagramStatus} from '../../runtime/types.js';
 import {usePlantUmlConfig} from '../usePlantUmlConfig.js';
+import {useZoomPan} from './useZoomPan.js';
 import styles from './styles.module.css';
 
 export interface PlantUmlDiagramProps {
@@ -17,6 +18,11 @@ export interface PlantUmlDiagramProps {
   title?: string;
   /** The fence language that matched, e.g. `plantuml` or `puml`. */
   language?: string;
+  /**
+   * Overrides the `zoom` plugin option for this diagram. `undefined` follows the option.
+   * Set from the fence metastring: `zoom` or `zoom=false`.
+   */
+  zoom?: boolean;
 }
 
 const DEFAULT_LABEL = 'PlantUML diagram';
@@ -56,17 +62,28 @@ export default function PlantUmlDiagram({
   source,
   title,
   language,
+  zoom: zoomProp,
 }: PlantUmlDiagramProps): ReactNode {
   const config = usePlantUmlConfig();
   const {colorMode} = useColorMode();
   const containerRef = useRef<HTMLElement | null>(null);
+  const hintId = useId();
 
   const themeOption = config?.options.theme ?? 'auto';
   const dark = themeOption === 'auto' ? colorMode === 'dark' : themeOption === 'dark';
   const lazy = config?.options.lazy ?? true;
 
+  // A fence flag wins over the plugin option, which in turn wins over the built-in default.
+  const interactive = zoomProp ?? config?.options.zoom ?? true;
+
   const [state, setState] = useState<RenderState>(INITIAL_STATE);
   const [inView, setInView] = useState(!lazy);
+
+  // Called unconditionally, as hooks must be; it attaches nothing when not interactive.
+  const zoom = useZoomPan({
+    enabled: interactive && state.status === 'ready',
+    resetKey: `${source}|${dark ? 'dark' : 'light'}`,
+  });
 
   useEffect(() => {
     if (!lazy || inView) return undefined;
@@ -159,6 +176,18 @@ export default function PlantUmlDiagram({
   const label = title ?? DEFAULT_LABEL;
   const busy = state.status === 'loading' || state.status === 'rendering';
 
+  // The sanitized SVG always lives in this element, zoomable or not, so `role="img" > svg`
+  // stays a stable contract for tests and for author CSS.
+  const canvas = state.svg !== null && (
+    <div
+      className={styles.canvas}
+      role="img"
+      aria-label={label}
+      // Sanitized above unless `sanitizeSvg: false` was explicitly opted into.
+      dangerouslySetInnerHTML={{__html: state.svg}}
+    />
+  );
+
   return (
     <figure
       ref={containerRef}
@@ -168,16 +197,84 @@ export default function PlantUmlDiagram({
         [DATA_ATTR.diagram]: language ?? 'plantuml',
         [DATA_ATTR.status]: state.status,
         [DATA_ATTR.theme]: dark ? 'dark' : 'light',
+        ...(interactive ? {[DATA_ATTR.interactive]: 'true'} : {}),
       }}
     >
-      {state.status === 'ready' && state.svg !== null && (
-        <div
-          className={styles.canvas}
-          role="img"
-          aria-label={label}
-          // Sanitized above unless `sanitizeSvg: false` was explicitly opted into.
-          dangerouslySetInnerHTML={{__html: state.svg}}
-        />
+      {state.status === 'ready' && state.svg !== null && !interactive && canvas}
+
+      {state.status === 'ready' && state.svg !== null && interactive && (
+        <div ref={zoom.stageRef} className={styles.stage}>
+          <div
+            ref={zoom.viewportRef}
+            className={styles.viewport}
+            tabIndex={0}
+            aria-describedby={hintId}
+            aria-keyshortcuts="Plus Minus 0 ArrowUp ArrowDown ArrowLeft ArrowRight"
+            onKeyDown={zoom.onKeyDown}
+            {...{[DATA_ATTR.zoom]: '1'}}
+          >
+            {/*
+             * The transform layer sits outside the `role="img"` element on purpose: that
+             * element uses `dangerouslySetInnerHTML`, so it cannot have React children, and
+             * `role="img"` makes its whole subtree opaque to assistive technology.
+             */}
+            <div ref={zoom.layerRef} className={styles.layer}>
+              {canvas}
+            </div>
+          </div>
+
+          {/*
+           * `role="group"`, not `role="toolbar"`: a toolbar owes readers arrow-key navigation
+           * between its buttons, and the arrow keys already pan the diagram.
+           */}
+          <div className={styles.toolbar} role="group" aria-label={`${label} zoom controls`}>
+            <button
+              type="button"
+              className={styles.toolbarButton}
+              aria-label="Zoom out"
+              onClick={zoom.zoomOut}
+            >
+              <span aria-hidden="true">−</span>
+            </button>
+            <button
+              type="button"
+              className={styles.toolbarButton}
+              aria-label="Zoom in"
+              onClick={zoom.zoomIn}
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+            <button
+              type="button"
+              className={styles.toolbarButton}
+              aria-label="Reset zoom"
+              onClick={zoom.reset}
+            >
+              <span aria-hidden="true">⟲</span>
+            </button>
+            {zoom.fullscreenSupported && (
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label="Toggle fullscreen"
+                onClick={zoom.toggleFullscreen}
+              >
+                <span aria-hidden="true">⛶</span>
+              </button>
+            )}
+            {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
+            <span ref={zoom.readoutRef} className={styles.readout} aria-hidden="true">
+              100%
+            </span>
+          </div>
+        </div>
+      )}
+
+      {state.status === 'ready' && state.svg !== null && interactive && (
+        <p id={hintId} className={styles.visuallyHidden}>
+          Zoomable diagram. Use the zoom controls, or press plus and minus to zoom, the arrow keys
+          to pan, and zero to reset.
+        </p>
       )}
 
       {state.status !== 'ready' && state.status !== 'error' && (

@@ -26,4 +26,11 @@ export const DATA_ATTR = {
   diagram: 'data-plantuml-diagram',
   status: 'data-plantuml-status',
   theme: 'data-plantuml-theme',
+  /** `"true"` on the figure when the diagram is zoomable. */
+  interactive: 'data-plantuml-interactive',
+  /**
+   * Current scale, on the viewport rather than the figure. Keeping it off the figure means
+   * the imperative zoom writes can never race React's attribute diffing.
+   */
+  zoom: 'data-plantuml-zoom',
 } as const;

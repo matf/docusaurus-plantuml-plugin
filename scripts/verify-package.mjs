@@ -31,6 +31,8 @@ const REQUIRED_FILES = [
   'dist/runtime/assetLoader.js',
   'dist/theme/MDXComponents/Code/index.js',
   'dist/theme/PlantUmlDiagram/index.js',
+  'dist/theme/PlantUmlDiagram/useZoomPan.js',
+  'dist/theme/PlantUmlDiagram/zoomMath.js',
   'dist/theme/PlantUmlDiagram/styles.module.css',
   'README.md',
   'LICENSE',

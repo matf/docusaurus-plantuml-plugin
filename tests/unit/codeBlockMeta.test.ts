@@ -4,6 +4,7 @@ import {
   extractLanguage,
   extractSource,
   isPlantUmlLanguage,
+  parseBooleanMeta,
   parseTitle,
 } from '../../src/theme/codeBlockMeta.js';
 
@@ -109,5 +110,55 @@ describe('title metadata', () => {
 
   it('does not confuse a mismatched quote pair for a title', () => {
     expect(parseTitle({metastring: 'title="unterminated'})).toBeUndefined();
+  });
+});
+
+describe('boolean fence flags', () => {
+  const zoom = (metastring?: string) => parseBooleanMeta({metastring}, 'zoom');
+
+  it('reads a bare flag as true', () => {
+    expect(zoom('zoom')).toBe(true);
+  });
+
+  it('reads an explicit value', () => {
+    expect(zoom('zoom=true')).toBe(true);
+    expect(zoom('zoom=false')).toBe(false);
+  });
+
+  it('is case-insensitive in both the key and the value', () => {
+    expect(zoom('ZOOM=TRUE')).toBe(true);
+    expect(zoom('Zoom=False')).toBe(false);
+  });
+
+  it('finds the flag among other metadata', () => {
+    expect(zoom('showLineNumbers zoom title="Topology"')).toBe(true);
+    expect(zoom('title="Topology" zoom=false')).toBe(false);
+  });
+
+  it('returns undefined when the flag is absent', () => {
+    expect(zoom()).toBeUndefined();
+    expect(zoom('')).toBeUndefined();
+    expect(zoom('showLineNumbers')).toBeUndefined();
+  });
+
+  it('does not match a flag embedded in another word', () => {
+    expect(zoom('nozoom')).toBeUndefined();
+    expect(zoom('zoomed')).toBeUndefined();
+    expect(zoom('autozoom=true')).toBeUndefined();
+  });
+
+  it('ignores a flag that only appears inside a quoted value', () => {
+    // Otherwise a diagram titled "zoom=false" would silently disable its own zoom.
+    expect(zoom('title="zoom=false"')).toBeUndefined();
+    expect(zoom("title='zoom'")).toBeUndefined();
+  });
+
+  it('ignores an unrecognized value rather than failing the build', () => {
+    expect(zoom('zoom=maybe')).toBeUndefined();
+    expect(zoom('zoom=1')).toBeUndefined();
+  });
+
+  it('reads a flag other than zoom', () => {
+    expect(parseBooleanMeta({metastring: 'foo=false'}, 'foo')).toBe(false);
   });
 });

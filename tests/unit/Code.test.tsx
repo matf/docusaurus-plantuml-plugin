@@ -7,8 +7,23 @@ import {removeStubGlobalData, setStubOptions} from '../stubs/state.js';
 
 // The diagram component is exercised separately; here only delegation matters.
 vi.mock('@theme/PlantUmlDiagram', () => ({
-  default: ({source, title, language}: {source: string; title?: string; language?: string}) => (
-    <div data-testid="diagram" data-title={title} data-language={language}>
+  default: ({
+    source,
+    title,
+    language,
+    zoom,
+  }: {
+    source: string;
+    title?: string;
+    language?: string;
+    zoom?: boolean;
+  }) => (
+    <div
+      data-testid="diagram"
+      data-title={title}
+      data-language={language}
+      data-zoom={zoom === undefined ? 'inherit' : String(zoom)}
+    >
       {source}
     </div>
   ),
@@ -54,6 +69,20 @@ describe('intercepting PlantUML fences', () => {
     expect(screen.getByTestId('diagram').textContent).toBe('@startuml\nAlice -> Bob\n@enduml');
   });
 
+  it('passes the fence zoom flag through to the diagram', () => {
+    render(
+      <Code className="language-plantuml" metastring="zoom=false">
+        {DIAGRAM}
+      </Code>,
+    );
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-zoom', 'false');
+  });
+
+  it('leaves zoom to the plugin option when the fence says nothing', () => {
+    render(<Code className="language-plantuml">{DIAGRAM}</Code>);
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-zoom', 'inherit');
+  });
+
   it('honours a custom language list', () => {
     setStubOptions({languages: ['uml']});
 
@@ -84,6 +113,20 @@ describe('delegating everything else', () => {
       className: 'language-ts',
       metastring: 'title="example.ts"',
       children: 'export const x = 1;\n',
+    });
+  });
+
+  it('delegates an ordinary fence carrying a zoom flag, untouched', () => {
+    render(
+      <Code className="language-ts" metastring="zoom">
+        {'const a = 1;\n'}
+      </Code>,
+    );
+    expect(screen.queryByTestId('diagram')).toBeNull();
+    expect(originalCodeCalls[0]).toEqual({
+      className: 'language-ts',
+      metastring: 'zoom',
+      children: 'const a = 1;\n',
     });
   });
 

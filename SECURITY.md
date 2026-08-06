@@ -2,13 +2,13 @@
 
 ## Supported versions
 
-This project is at `0.x`. Only the latest released version receives security fixes. There are
-no maintained release branches.
+Only the latest minor of the current major receives security fixes. There are no maintained
+release branches.
 
 | Version | Supported |
 | ------- | --------- |
-| `0.1.x` | yes       |
-| older   | no        |
+| `1.0.x` | yes       |
+| `0.1.x` | no        |
 
 ## Reporting a vulnerability
 
@@ -51,6 +51,13 @@ plantuml.com, to a Kroki instance, or to any other service, and there is no conf
 would make it do so. The PlantUML engine (`viz-global.js` and `plantuml.js`) is copied out of
 the installed `@plantuml/core` dependency into your own build output and served from your own
 origin under your `baseUrl` — never from a CDN.
+
+### Zooming never touches the sanitized markup
+
+Zoom and pan apply a CSS transform to a wrapper element. The sanitized SVG is never mutated,
+never re-serialized and never re-parsed after it has been inserted — re-serializing purified
+markup is the mutation-XSS shape this deliberately avoids. See
+[ADR 0003](docs/adr/0003-zoom-container-transform.md).
 
 ### Rendered SVG is treated as untrusted
 

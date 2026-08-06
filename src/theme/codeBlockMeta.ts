@@ -59,6 +59,39 @@ export function extractSource(children: ReactNode): string | null {
   return source.replace(/\n$/, '');
 }
 
+/**
+ * Quoted segments, removed before flag matching so that a value such as
+ * `title="zoom=false"` can never be mistaken for a flag.
+ */
+const QUOTED_SEGMENT = /(["'])(?:\\.|(?!\1).)*\1/g;
+
+/**
+ * Reads a boolean flag from the fence metastring: either bare (`zoom`) or explicit
+ * (`zoom=true` / `zoom=false`).
+ *
+ * Returns `undefined` when the flag is absent or malformed, which the caller reads as "fall
+ * back to the plugin option". A fence metastring is authored prose, not configuration, so an
+ * unrecognized value is ignored rather than failing the site build.
+ */
+export function parseBooleanMeta(props: CodeBlockProps, key: string): boolean | undefined {
+  const metastring = props.metastring;
+  if (typeof metastring !== 'string' || metastring === '') return undefined;
+
+  const withoutQuoted = metastring.replace(QUOTED_SEGMENT, ' ');
+  // Word boundaries by hand: `nozoom` and `zoomed` must not match `zoom`.
+  const pattern = new RegExp(`(?:^|\\s)${key}(?:=(\\S+))?(?=\\s|$)`, 'i');
+  const match = pattern.exec(withoutQuoted);
+  if (!match) return undefined;
+
+  const value = match[1];
+  if (value === undefined) return true;
+
+  const normalized = value.toLowerCase();
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+  return undefined;
+}
+
 /** Reads `title="..."` (or `title='...'`) from the fence metastring. */
 export function parseTitle(props: CodeBlockProps): string | undefined {
   if (typeof props.title === 'string' && props.title !== '') return props.title;
