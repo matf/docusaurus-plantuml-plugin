@@ -60,7 +60,9 @@ function formatBytes(bytes) {
 
 let packOutput;
 try {
-  packOutput = execFileSync('npm', ['pack', '--dry-run', '--json'], {
+  // `--silent` suppresses npm's own notices and warnings. Without it, a warning such as the
+  // `always-auth` one that `actions/setup-node` provokes lands on stdout beside the JSON.
+  packOutput = execFileSync('npm', ['pack', '--dry-run', '--json', '--silent'], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -70,9 +72,28 @@ try {
   process.exit(1);
 }
 
-// npm can prefix the JSON with notices on stdout; take the JSON array only.
-const jsonStart = packOutput.indexOf('[');
-const result = JSON.parse(packOutput.slice(jsonStart))[0];
+/**
+ * Extracts the JSON array, tolerating anything npm prints around it.
+ *
+ * Slicing only from the first `[` is not enough: npm can emit notices *after* the payload too,
+ * and `JSON.parse` rejects trailing content.
+ */
+function parsePackOutput(output) {
+  const start = output.indexOf('[');
+  const end = output.lastIndexOf(']');
+  if (start === -1 || end === -1 || end < start) {
+    console.error('Could not find a JSON array in `npm pack --json` output:\n', output);
+    process.exit(1);
+  }
+  try {
+    return JSON.parse(output.slice(start, end + 1));
+  } catch (error) {
+    console.error('Could not parse `npm pack --json` output:\n', output, '\n', error.message);
+    process.exit(1);
+  }
+}
+
+const result = parsePackOutput(packOutput)[0];
 const files = result.files.map((file) => ({path: file.path, size: file.size}));
 const problems = [];
 
