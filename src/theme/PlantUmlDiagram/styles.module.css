@@ -303,6 +303,7 @@
 
 /* One grid cell shared by the viewport and the source view, so they occupy the same box. */
 .stageBody {
+  position: relative;
   display: grid;
 }
 
@@ -325,6 +326,18 @@
 /* Collapses entirely — used where there is no frame height worth preserving. */
 .hiddenView {
   display: none;
+}
+
+/*
+ * Inside a zoom frame the source is taken out of flow so that it cannot size the grid row: the
+ * row stays exactly as tall as the (hidden but still laid-out) viewport, and a long source
+ * scrolls within it. Left in flow it grew the frame from the diagram's height to the source's —
+ * on a long diagram that pushed the text back off the bottom of the window, which is the very
+ * problem moving it into the frame was meant to solve.
+ */
+.stageBody .sourceView {
+  position: absolute;
+  inset: 0;
 }
 
 .sourceView {
