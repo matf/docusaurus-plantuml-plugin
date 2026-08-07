@@ -461,7 +461,10 @@ box, with a copy button. Three structural decisions carry the weight:
 
 The zoom controls are hidden while the source is shown — they would act on a picture nobody can
 see — but **maximize stays**, because it sizes the frame the source is read in and removing it
-while maximized would leave Escape as the only way back.
+while maximized would leave Escape as the only way back. The **copy control joins the same
+toolbar** while the source is on screen, rather than sitting in a header bar of its own: the
+diagram view has no header chrome, so giving the source view some made the two read as different
+kinds of thing rather than two views of one.
 
 Where there is no zoom frame (`zoom: false`) the canvas collapses with `display: none` instead:
 there is no box height worth preserving, and collapsing lets the source take the diagram's place

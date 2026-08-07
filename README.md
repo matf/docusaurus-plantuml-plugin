@@ -503,8 +503,8 @@ Setting `zoom: false` restores the previous markup exactly.
 ## Source view
 
 Every rendered diagram offers its own source. The `</>` control in the toolbar **flips the
-frame**: the source takes the diagram's place, in the same box, with a button that copies it to
-the clipboard. Press it again to flip back.
+frame**: the source takes the diagram's place, in the same box. A **Copy** button appears beside
+it in the same toolbar while the source is shown. Press `</>` again to flip back.
 
 ````markdown
 ```plantuml title="Readers can copy this"

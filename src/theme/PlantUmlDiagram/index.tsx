@@ -289,6 +289,17 @@ export default function PlantUmlDiagram({
     />
   );
 
+  const copyControl = sourceAvailable && sourceOpen && state.status === 'ready' && (
+    <button
+      type="button"
+      className={`${styles.toolbarButton} ${styles.toolbarTextButton}`}
+      aria-label={`Copy ${engineName} source to clipboard`}
+      onClick={copySource}
+    >
+      Copy
+    </button>
+  );
+
   const sourceToggle = sourceAvailable && (
     <button
       type="button"
@@ -313,6 +324,12 @@ export default function PlantUmlDiagram({
    */
   const sourceView = sourceAvailable && sourceOpen && state.status === 'ready' && (
     <div className={styles.sourceView} id={sourcePanelId}>
+      {/*
+       * A label and the copy result, with no rule beneath them: the diagram view has no header
+       * chrome, so giving the source view a bordered bar made the two look like different kinds
+       * of thing. The copy control itself lives in the toolbar, beside zoom and the view switch,
+       * where every other control on a diagram already is.
+       */}
       <div className={styles.sourceViewBar}>
         <span className={styles.sourceViewTitle}>{engineName} source</span>
         {/*
@@ -323,14 +340,6 @@ export default function PlantUmlDiagram({
           {copyState === 'copied' ? 'Copied to clipboard' : null}
           {copyState === 'failed' ? 'Could not copy — select the text instead' : null}
         </span>
-        <button
-          type="button"
-          className={styles.copyButton}
-          aria-label={`Copy ${engineName} source to clipboard`}
-          onClick={copySource}
-        >
-          Copy
-        </button>
       </div>
       <pre className={styles.sourceCode}>{source}</pre>
     </div>
@@ -375,6 +384,7 @@ export default function PlantUmlDiagram({
       {state.status === 'ready' && state.svg !== null && !interactive && sourceAvailable && (
         <div className={styles.plainToolbar} role="group" aria-label={`${label} source controls`}>
           {sourceToggle}
+          {copyControl}
         </div>
       )}
 
@@ -467,6 +477,7 @@ export default function PlantUmlDiagram({
               <span aria-hidden="true">{zoom.maximized ? '✕' : '⛶'}</span>
             </button>
             {sourceToggle}
+            {copyControl}
             {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
             <span
               ref={zoom.readoutRef}

@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **A source view for every rendered diagram.** A `</>` control in the toolbar, beside the zoom
-  buttons, **flips the frame**: the source takes the diagram's place, in the same box, with a
-  button that copies it to the clipboard. Enabled by default; turn it off with
+  buttons, **flips the frame**: the source takes the diagram's place, in the same box. A
+  **Copy** button joins the same toolbar while the source is shown, so every control on a
+  diagram lives in one place. Enabled by default; turn it off with
   `showSource: false`, or per fence with `showSource=false` in the metastring.
 
   Four details are deliberate:

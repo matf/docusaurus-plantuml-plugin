@@ -173,6 +173,39 @@ describe('copying the source', () => {
     expect(await screen.findByText('Copied to clipboard')).toBeInTheDocument();
   });
 
+  it('puts the copy control in the toolbar, beside the other diagram controls', async () => {
+    // Not in a header bar of its own: the diagram view has no header chrome, so one on the
+    // source view made the two look like different kinds of thing.
+    const user = setupUser();
+    await renderReady();
+    await user.click(toggle());
+
+    const copy = screen.getByRole('button', {name: /copy .* source to clipboard/i});
+    expect(screen.getByRole('group', {name: /zoom controls/})).toContainElement(copy);
+  });
+
+  it('offers the copy control only while the source is on screen', async () => {
+    const user = setupUser();
+    await renderReady();
+    expect(screen.queryByRole('button', {name: /copy .* source to clipboard/i})).toBeNull();
+
+    await user.click(toggle());
+    expect(screen.getByRole('button', {name: /copy .* source to clipboard/i})).toBeInTheDocument();
+
+    await user.click(toggle());
+    expect(screen.queryByRole('button', {name: /copy .* source to clipboard/i})).toBeNull();
+  });
+
+  it('keeps the copy control reachable without a zoom toolbar', async () => {
+    setStubOptions({zoom: false});
+    const user = setupUser();
+    await renderReady();
+    await user.click(toggle());
+
+    const copy = screen.getByRole('button', {name: /copy .* source to clipboard/i});
+    expect(screen.getByRole('group', {name: /source controls/})).toContainElement(copy);
+  });
+
   it('announces the result without renaming the button', async () => {
     // A changing accessible name would be announced as a new control every time.
     const user = setupUser();
