@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2]
+
+### Fixed
+
+- De-flaked the zoom test suite. `data-plantuml-status="ready"` is written during the render
+  commit, but `useZoomPan` attaches its listeners and writes the initial transform from
+  *passive* effects that React flushes afterwards. The shared `renderReady()` helper returned on
+  the attribute alone, so a test could act on the viewport in between — a dispatched wheel event
+  found no listener, and a zoom set before the reset effect ran was immediately overwritten.
+  Both surfaced on CI as a scale stuck at 1, and one of them failed the `1.1.1` release build.
+  The helper now also waits for the hook's inline transform, which only the hook ever writes.
+
+### Changed
+
+- Development dependencies: `vitest` and `@vitest/coverage-v8` `3` → `4`, and
+  `@testing-library/jest-dom` `6` → `7`. No product code changed; all 433 tests and the
+  coverage report pass unchanged.
+
+- `.github/dependabot.yml` now ignores the majors that are blocked upstream rather than merely
+  unreviewed, each with the reason and the condition for revisiting. Left un-ignored they
+  produced a grouped pull request that could never go green, which hid the updates that *were*
+  takeable:
+  - **TypeScript 7** — typescript-eslint refuses to run against it
+    ([typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)).
+  - **ESLint 10** — `eslint-plugin-react@7.37.5`, the latest release, still caps its peer range
+    at `^9.7`.
+  - **eslint-plugin-react-hooks 7** — its React Compiler rules flag 15 places in `useZoomPan`
+    that are the deliberate design recorded in
+    [ADR 0003](docs/adr/0003-zoom-container-transform.md).
+
 ## [1.1.1]
 
 ### Security
@@ -217,7 +247,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.2...v1.0.3
