@@ -63,11 +63,27 @@ function scrollIntoView(): void {
   });
 }
 
-/** Renders and waits for the diagram to reach the ready state. */
+/**
+ * Renders and waits for the diagram to be ready **and for the zoom hook to have taken hold**.
+ *
+ * `data-plantuml-status="ready"` is written during the render commit, but `useZoomPan` attaches
+ * its listeners and writes the initial transform from *passive* effects, which React flushes
+ * afterwards. Returning on the attribute alone let a test act on the viewport in between: a
+ * dispatched wheel event found no listener, and a zoom set before the reset effect ran was
+ * immediately overwritten with the identity transform. Both showed up on CI as a scale that
+ * stubbornly stayed at 1.
+ *
+ * The inline transform is the signal to wait on because only the hook ever writes it — React
+ * renders no `style` on the layer, so a non-empty value cannot come from anywhere else.
+ */
 async function renderReady(props: Parameters<typeof PlantUmlDiagram>[0] = {source: SOURCE}) {
   const result = render(<PlantUmlDiagram {...props} />);
   scrollIntoView();
   await waitFor(() => expect(figure()).toHaveAttribute('data-plantuml-status', 'ready'));
+  // Absent when the diagram opted out of zoom, which is a state several tests render on purpose.
+  if (document.querySelector('[data-plantuml-zoom]')) {
+    await waitFor(() => expect(layer().style.transform).not.toBe(''));
+  }
   return result;
 }
 
@@ -228,14 +244,17 @@ describe('wheel policy', () => {
     const prevented = wheel(viewport(), {deltaY: -120, ctrlKey: true});
 
     expect(prevented).toBe(true);
-    expect(Number(zoomLevel())).toBeGreaterThan(1);
+    await waitFor(() => expect(Number(zoomLevel())).toBeGreaterThan(1));
     expect(layer().style.transform).toMatch(/scale\(/);
   });
 
   it('zooms out on ctrl + wheel downwards', async () => {
     await renderReady();
     wheel(viewport(), {deltaY: 120, ctrlKey: true});
-    expect(Number(zoomLevel())).toBeLessThan(1);
+    // Polled rather than asserted outright: the write is synchronous, but this ran ahead of
+    // the hook's own effects on a loaded CI machine and read the untouched initial 1. A wrong
+    // value still fails — it just fails after the poll gives up rather than instantly.
+    await waitFor(() => expect(Number(zoomLevel())).toBeLessThan(1));
   });
 
   it('ignores meta + wheel, which is the browser page zoom on macOS', async () => {

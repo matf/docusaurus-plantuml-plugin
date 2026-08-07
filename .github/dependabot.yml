@@ -28,6 +28,33 @@ updates:
       - dependency-name: '@plantuml/core'
         update-types: ['version-update:semver-major']
 
+      # Majors that are blocked upstream, not merely unreviewed. Each was tried, each broke
+      # something that cannot be fixed from this repository, and leaving them un-ignored means
+      # a grouped PR that can never go green — which hides the updates that *are* takeable.
+      # Revisit by deleting the entry and letting Dependabot re-propose it.
+
+      # TypeScript 7 removes the TS 6 compiler API that typescript-eslint uses, and it refuses
+      # to run: "typescript-eslint does not support TS 7.0". Tracked upstream at
+      # typescript-eslint#10940. Blocked until typescript-eslint ships TS >= 7.1 support.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+
+      # ESLint 10 is blocked by eslint-plugin-react, whose latest release (7.37.5) still caps
+      # its peer range at `^9.7`. typescript-eslint and eslint-config-prettier are both ready;
+      # this is the one plugin holding the upgrade. Blocked until it publishes ESLint 10 support.
+      - dependency-name: 'eslint'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@eslint/js'
+        update-types: ['version-update:semver-major']
+
+      # eslint-plugin-react-hooks 7 turns on the React Compiler rules. `react-hooks/refs` and
+      # `react-hooks/set-state-in-effect` flag 15 places in `useZoomPan`, all of them the
+      # deliberate design recorded in docs/adr/0003-zoom-container-transform.md: the transform
+      # lives in a ref and is written straight to the DOM so that panning never re-renders.
+      # Adopting it would mean redesigning that hook or blanket-disabling the new rules.
+      - dependency-name: 'eslint-plugin-react-hooks'
+        update-types: ['version-update:semver-major']
+
   - package-ecosystem: npm
     directory: '/examples/docusaurus'
     schedule:
