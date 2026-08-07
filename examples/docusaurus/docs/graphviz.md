@@ -141,3 +141,24 @@ Alice -> Bob : Hello
 Bob --> Alice : Hi
 @enduml
 ```
+
+## Source view
+
+Every diagram offers its own source through the `</>` control in the toolbar, next to the zoom
+buttons. Open it and the source appears below the diagram with a button that copies it to the
+clipboard.
+
+```dot title="Open the source of this one" showSource
+digraph {
+  rankdir=LR;
+  reader -> "source view" -> clipboard;
+}
+```
+
+A fence can opt out with `showSource=false`:
+
+```dot title="No source control" showSource=false
+digraph {
+  hidden -> source;
+}
+```

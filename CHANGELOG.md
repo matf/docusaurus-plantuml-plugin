@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0]
+
+### Added
+
+- **A source view for every rendered diagram.** A `</>` control in the toolbar, beside the zoom
+  buttons, **flips the frame**: the source takes the diagram's place, in the same box. A
+  **Copy** button joins the same toolbar while the source is shown, so every control on a
+  diagram lives in one place. Enabled by default; turn it off with
+  `showSource: false`, or per fence with `showSource=false` in the metastring.
+
+  Four details are deliberate:
+  - **It shares the diagram's frame rather than sitting below it.** Below the diagram it had two
+    failure modes: a diagram taller than the window pushed it off-screen, and while maximized it
+    was painted behind the full-screen overlay. Sharing the frame removes both by construction.
+  - **The diagram is hidden, not unmounted**, so the frame keeps its height — nothing on the page
+    moves when you flip — and the reader's zoom and pan survive the round trip.
+  - The copy result is announced through a `role="status"` region rather than by renaming the
+    button, because a control whose accessible name changes is announced as a new control.
+  - A failed copy says so. `navigator.clipboard` is undefined outside a secure context, which a
+    docs site on plain HTTP genuinely is; the source is on screen either way, so the reader can
+    select the text.
+
+- `showSource` plugin option and the matching `showSource` / `showSource=false` fence flag.
+- `data-plantuml-source-open="true"` on the `<figure>` while the source is shown, part of the
+  documented `data-*` contract.
+
+### Changed
+
+- The zoom controls are hidden while the source is shown — they would act on a picture nobody
+  can see. **Maximize stays**, because it sizes the frame the source is read in and removing it
+  while maximized would leave Escape as the only way back out.
+
+- With `zoom: false` the source control gets its own row after the diagram, since there is no
+  zoom toolbar to join. `figure > div[role="img"]` remains the first child, so the shape the
+  pre-zoom markup has always had is unchanged. Setting both `zoom: false` and
+  `showSource: false` restores the bare markup exactly.
+
 ## [1.1.2]
 
 ### Fixed
@@ -247,7 +284,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.3...v1.1.0

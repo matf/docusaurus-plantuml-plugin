@@ -30,6 +30,7 @@ declare module '@theme/PlantUmlDiagram' {
     engine?: 'plantuml' | 'graphviz';
     layout?: string;
     zoom?: boolean;
+    showSource?: boolean;
   }
 
   const PlantUmlDiagram: ComponentType<Props>;

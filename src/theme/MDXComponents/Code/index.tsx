@@ -51,6 +51,7 @@ export default function Code(props: CodeBlockProps): ReactNode {
       engine={engine}
       layout={engine === 'graphviz' ? parseStringMeta(props, 'engine') : undefined}
       zoom={parseBooleanMeta(props, 'zoom')}
+      showSource={parseBooleanMeta(props, 'showSource')}
     />
   );
 }

@@ -440,6 +440,51 @@ wrapped by a viewport and a transform layer, with the control group as a sibling
 shapes `div[role="img"] > svg` holds, which is what keeps the selector stable for tests and for
 author CSS.
 
+## Source view
+
+The `</>` toolbar control **flips the frame**: the source takes the diagram's place in the same
+box, with a copy button. Three structural decisions carry the weight:
+
+- **The source and the viewport share one CSS grid cell** (`.stageBody > * {grid-area: 1/1}`),
+  so the source lands exactly where the picture was, at exactly its size. It was first rendered
+  _below_ the diagram, which had two failure modes found in review: a diagram taller than the
+  window pushed it off-screen, and while maximized it was painted behind the `position: fixed`
+  overlay — present, in the viewport, and invisible. Sharing the frame removes both by
+  construction rather than by patching each case.
+- **The viewport is hidden with `visibility`, not `display`.** It keeps contributing its height,
+  so the frame does not resize when flipping, and the zoom hook's `clientWidth`/`clientHeight`
+  measurements stay valid for the flip back. A `visibility: hidden` subtree is also unfocusable
+  and takes no pointer events, so the invisible diagram cannot be tabbed into or dragged; its
+  `tabIndex` is set to `-1` as well, belt and braces.
+- **It sits outside the `role="img"` container**, for the same reason the zoom controls do:
+  `role="img"` makes its whole subtree opaque to assistive technology.
+
+The zoom controls are hidden while the source is shown — they would act on a picture nobody can
+see — but **maximize stays**, because it sizes the frame the source is read in and removing it
+while maximized would leave Escape as the only way back. The **copy control joins the same
+toolbar** while the source is on screen, rather than sitting in a header bar of its own: the
+diagram view has no header chrome, so giving the source view some made the two read as different
+kinds of thing rather than two views of one.
+
+Where there is no zoom frame (`zoom: false`) the canvas collapses with `display: none` instead:
+there is no box height worth preserving, and collapsing lets the source take the diagram's place
+rather than appear below it. The canvas stays mounted, so `figure > div[role="img"]` remains the
+figure's first child — the pre-zoom shape both suites pin.
+
+- **The copy outcome goes to a `role="status"` region, not the button's label.** Renaming a
+  control changes its accessible name, and a screen reader announces that as a new control
+  appearing rather than as the result of the action just taken.
+
+Copying uses `navigator.clipboard.writeText`, which is **undefined outside a secure context** —
+a docs site served over plain HTTP. That case is reported rather than swallowed; the panel is
+open regardless, so the reader can select the text by hand. The feedback timer is cleared on
+unmount, and the copy state resets when the diagram source changes so a stale "Copied" can never
+describe text that is no longer on screen.
+
+With `zoom: false` there is no toolbar to join, so the control gets its own row rendered _after_
+the canvas. That ordering is what keeps `figure > div[role="img"]` as the first child — the
+shape the pre-zoom markup has always had, which both the unit and end-to-end suites pin.
+
 ## Zoom and pan
 
 `runtime/` owns rendering; zooming lives entirely in the theme layer, split into

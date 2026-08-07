@@ -231,19 +231,20 @@ props untouched. Existing code-block behaviour (highlighting, line numbers, titl
 
 ## Options
 
-| Option              | Type                              | Default                | Description                                                                                                                |
-| ------------------- | --------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `languages`         | `string[]`                        | `['plantuml', 'puml']` | Fence languages treated as PlantUML. Matched case-insensitively; must contain at least one non-empty, non-duplicate entry. |
-| `theme`             | `'auto' \| 'light' \| 'dark'`     | `'auto'`               | Diagram colour scheme. `auto` follows the Docusaurus colour mode; `light`/`dark` pin it.                                   |
-| `lazy`              | `boolean`                         | `true`                 | Render a diagram only once it scrolls near the viewport (300 px root margin).                                              |
-| `cache`             | `'none' \| 'memory' \| 'session'` | `'memory'`             | Where rendered SVG is cached.                                                                                              |
-| `sanitizeSvg`       | `boolean`                         | `true`                 | Run rendered SVG through DOMPurify before inserting it. See [Security model](#svg-sanitization-and-security-model).        |
-| `showSourceOnError` | `boolean`                         | `true`                 | Include the diagram source in a `<details>` block on the error panel.                                                      |
-| `renderTimeoutMs`   | `number`                          | `20000`                | Abort a single render (and the runtime load) after this many milliseconds. Integer, `100`–`600000`.                        |
-| `cacheMaxEntries`   | `number`                          | `50`                   | Upper bound on cached SVG entries. Positive integer.                                                                       |
-| `zoom`              | `boolean`                         | `true`                 | Let readers zoom and pan diagrams. Adds a control toolbar and a focusable viewport. Override per fence with `zoom=false`.  |
-| `graphviz`          | `object`                          | see below              | Graphviz/DOT support. See [Graphviz options](#graphviz-options).                                                           |
-| `id`                | `string`                          | `'default'`            | Docusaurus plugin instance id; only relevant if you register the plugin more than once.                                    |
+| Option              | Type                              | Default                | Description                                                                                                                         |
+| ------------------- | --------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `languages`         | `string[]`                        | `['plantuml', 'puml']` | Fence languages treated as PlantUML. Matched case-insensitively; must contain at least one non-empty, non-duplicate entry.          |
+| `theme`             | `'auto' \| 'light' \| 'dark'`     | `'auto'`               | Diagram colour scheme. `auto` follows the Docusaurus colour mode; `light`/`dark` pin it.                                            |
+| `lazy`              | `boolean`                         | `true`                 | Render a diagram only once it scrolls near the viewport (300 px root margin).                                                       |
+| `cache`             | `'none' \| 'memory' \| 'session'` | `'memory'`             | Where rendered SVG is cached.                                                                                                       |
+| `sanitizeSvg`       | `boolean`                         | `true`                 | Run rendered SVG through DOMPurify before inserting it. See [Security model](#svg-sanitization-and-security-model).                 |
+| `showSourceOnError` | `boolean`                         | `true`                 | Include the diagram source in a `<details>` block on the error panel.                                                               |
+| `renderTimeoutMs`   | `number`                          | `20000`                | Abort a single render (and the runtime load) after this many milliseconds. Integer, `100`–`600000`.                                 |
+| `cacheMaxEntries`   | `number`                          | `50`                   | Upper bound on cached SVG entries. Positive integer.                                                                                |
+| `zoom`              | `boolean`                         | `true`                 | Let readers zoom and pan diagrams. Adds a control toolbar and a focusable viewport. Override per fence with `zoom=false`.           |
+| `showSource`        | `boolean`                         | `true`                 | Offer a toolbar control that reveals the diagram source and copies it to the clipboard. Override per fence with `showSource=false`. |
+| `graphviz`          | `object`                          | see below              | Graphviz/DOT support. See [Graphviz options](#graphviz-options).                                                                    |
+| `id`                | `string`                          | `'default'`            | Docusaurus plugin instance id; only relevant if you register the plugin more than once.                                             |
 
 Every option above except `graphviz` applies to **both** engines: `lazy`, `cache`,
 `sanitizeSvg`, `showSourceOnError`, `renderTimeoutMs`, `cacheMaxEntries` and `zoom` behave
@@ -257,7 +258,7 @@ would otherwise silently disable the option you meant to set:
 ```text
 [docusaurus-plugin-plantuml-client] Unknown option 'sanitiseSvg'. Supported options:
 'languages', 'theme', 'lazy', 'cache', 'sanitizeSvg', 'showSourceOnError',
-'renderTimeoutMs', 'cacheMaxEntries', 'zoom', 'graphviz'.
+'renderTimeoutMs', 'cacheMaxEntries', 'zoom', 'showSource', 'graphviz'.
 ```
 
 The same is true one level deeper, so `graphviz: {enigne: 'neato'}` fails the build rather than
@@ -498,6 +499,58 @@ would mean most readers never discover it. The costs are real and worth knowing:
   `ready` state.
 
 Setting `zoom: false` restores the previous markup exactly.
+
+## Source view
+
+Every rendered diagram offers its own source. The `</>` control in the toolbar **flips the
+frame**: the source takes the diagram's place, in the same box. A **Copy** button appears beside
+it in the same toolbar while the source is shown. Press `</>` again to flip back.
+
+````markdown
+```plantuml title="Readers can copy this"
+@startuml
+Alice -> Bob : Hello
+@enduml
+```
+````
+
+Details worth knowing:
+
+- **The source shares the diagram's frame.** It was previously rendered _below_ the diagram,
+  which had two failure modes: a diagram taller than the window pushed it off-screen, so the
+  control looked broken; and while maximized it was painted behind the full-screen overlay, so
+  it was invisible however far you scrolled. In the frame it appears exactly where the picture
+  was.
+- **The diagram is hidden, not unmounted.** The frame keeps its height, so nothing on the page
+  moves when you flip, and your zoom and pan survive the round trip.
+- **The zoom controls step aside while the source is shown** — they would act on a picture
+  nobody can see. Maximize stays, because it sizes the frame the source is read in, and taking
+  it away while maximized would leave Escape as the only way out.
+- The source stays outside the `role="img"` subtree, which is opaque to assistive technology —
+  content inside it would be unreachable for screen-reader users.
+- **The copy result is announced through a `role="status"` region**, not by renaming the button.
+  A control whose accessible name changes is announced as a new control every time.
+- **A failed copy says so.** `navigator.clipboard` is undefined outside a secure context, which
+  a docs site served over plain HTTP genuinely is. The panel is open either way, so the reader
+  can select the text; the control never silently does nothing.
+- The panel shows the **authored source**, never the rendered SVG.
+
+Turn it off for a whole site with `showSource: false`, or for one fence:
+
+````markdown
+```plantuml showSource=false
+@startuml
+Alice -> Bob : Hello
+@enduml
+```
+````
+
+With `zoom: false` there is no zoom toolbar, so the control gets its own row after the diagram.
+Setting both `zoom: false` and `showSource: false` restores the bare markup the plugin produced
+before either feature existed.
+
+This is separate from `showSourceOnError`, which offers the source in the error panel when a
+diagram _fails_ to render.
 
 ## Lazy loading
 

@@ -44,8 +44,10 @@ test.describe('zoom and pan', () => {
     await expect(wide.locator('div[role="img"] > svg')).toHaveCount(1);
     const group = wide.getByRole('group', {name: /zoom controls/});
     await expect(group).toBeVisible();
-    await expect(group.getByRole('button')).toHaveCount(4);
+    // Zoom out, zoom in, reset, maximize, and the source toggle.
+    await expect(group.getByRole('button')).toHaveCount(5);
     await expect(group.getByRole('button', {name: 'Maximize diagram'})).toBeVisible();
+    await expect(group.getByRole('button', {name: 'Show diagram source'})).toBeVisible();
 
     // `zoom=false` on the fence removes all of it.
     const optedOut = figures.nth(1);

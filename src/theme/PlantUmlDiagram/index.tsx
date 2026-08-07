@@ -1,4 +1,4 @@
-import {useEffect, useId, useRef, useState, type ReactNode} from 'react';
+import {useCallback, useEffect, useId, useRef, useState, type ReactNode} from 'react';
 
 import {useColorMode} from '@docusaurus/theme-common';
 
@@ -31,6 +31,11 @@ export interface PlantUmlDiagramProps {
    * Set from the fence metastring: `zoom` or `zoom=false`.
    */
   zoom?: boolean;
+  /**
+   * Overrides the `showSource` plugin option for this diagram. `undefined` follows the option.
+   * Set from the fence metastring: `showSource` or `showSource=false`.
+   */
+  showSource?: boolean;
 }
 
 /**
@@ -44,6 +49,11 @@ const ENGINE_LABEL: Record<DiagramEngine, string> = {
 
 /** Margin large enough that a diagram is usually ready by the time it is scrolled into view. */
 const LAZY_ROOT_MARGIN = '300px';
+
+/** How long the copy result stays on screen before the control goes quiet again. */
+const COPY_FEEDBACK_MS = 2_000;
+
+type CopyState = 'idle' | 'copied' | 'failed';
 
 interface RenderState {
   status: DiagramStatus;
@@ -84,11 +94,13 @@ export default function PlantUmlDiagram({
   engine = 'plantuml',
   layout,
   zoom: zoomProp,
+  showSource: showSourceProp,
 }: PlantUmlDiagramProps): ReactNode {
   const config = usePlantUmlConfig();
   const {colorMode} = useColorMode();
   const containerRef = useRef<HTMLElement | null>(null);
   const hintId = useId();
+  const sourcePanelId = useId();
 
   const themeOption = config?.options.theme ?? 'auto';
   const dark = themeOption === 'auto' ? colorMode === 'dark' : themeOption === 'dark';
@@ -107,9 +119,46 @@ export default function PlantUmlDiagram({
 
   // A fence flag wins over the plugin option, which in turn wins over the built-in default.
   const interactive = zoomProp ?? config?.options.zoom ?? true;
+  const sourceAvailable = showSourceProp ?? config?.options.showSource ?? true;
 
   const [state, setState] = useState<RenderState>(INITIAL_STATE);
   const [inView, setInView] = useState(!lazy);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const [copyState, setCopyState] = useState<CopyState>('idle');
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // A pending "Copied" message must not fire into an unmounted component.
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
+
+  /**
+   * Copies the source, and says whether it worked.
+   *
+   * `navigator.clipboard` is undefined outside a secure context, which a documentation site
+   * served over plain HTTP genuinely is. Reporting that plainly is better than a control that
+   * silently does nothing — the panel is open, so the reader can still select the text.
+   */
+  const copySource = useCallback(() => {
+    const settle = (next: Exclude<CopyState, 'idle'>) => {
+      setCopyState(next);
+      clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopyState('idle'), COPY_FEEDBACK_MS);
+    };
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+    if (typeof clipboard?.writeText !== 'function') {
+      settle('failed');
+      return;
+    }
+    void clipboard.writeText(source).then(
+      () => settle('copied'),
+      () => settle('failed'),
+    );
+  }, [source]);
+
+  // A diagram whose source changed is a different diagram: an open panel would otherwise keep
+  // showing the old text's copy result, and the reader would have no idea it was stale.
+  useEffect(() => {
+    setCopyState('idle');
+  }, [source]);
 
   // Called unconditionally, as hooks must be; it attaches nothing when not interactive.
   const zoom = useZoomPan({
@@ -230,12 +279,70 @@ export default function PlantUmlDiagram({
   // stays a stable contract for tests and for author CSS.
   const canvas = state.svg !== null && (
     <div
-      className={styles.canvas}
+      className={
+        !interactive && sourceOpen ? `${styles.canvas} ${styles.hiddenView}` : styles.canvas
+      }
       role="img"
       aria-label={label}
       // Sanitized above unless `sanitizeSvg: false` was explicitly opted into.
       dangerouslySetInnerHTML={{__html: state.svg}}
     />
+  );
+
+  const copyControl = sourceAvailable && sourceOpen && state.status === 'ready' && (
+    <button
+      type="button"
+      className={`${styles.toolbarButton} ${styles.toolbarTextButton}`}
+      aria-label={`Copy ${engineName} source to clipboard`}
+      onClick={copySource}
+    >
+      Copy
+    </button>
+  );
+
+  const sourceToggle = sourceAvailable && (
+    <button
+      type="button"
+      className={styles.toolbarButton}
+      aria-label={sourceOpen ? 'Hide diagram source' : 'Show diagram source'}
+      aria-expanded={sourceOpen}
+      aria-controls={sourcePanelId}
+      onClick={() => setSourceOpen((open) => !open)}
+    >
+      <span aria-hidden="true">{'</>'}</span>
+    </button>
+  );
+
+  /**
+   * The source *replaces the diagram in its own frame* rather than appearing beneath it.
+   *
+   * Below the diagram it had two failure modes that the frame removes by construction: a
+   * diagram taller than the window pushed the panel off-screen, so the control looked broken;
+   * and while maximized the panel was painted behind the `position: fixed` overlay, so it was
+   * invisible however far you scrolled. Living in the same box as the picture, it is visible
+   * exactly when and where the picture was.
+   */
+  const sourceView = sourceAvailable && sourceOpen && state.status === 'ready' && (
+    <div className={styles.sourceView} id={sourcePanelId}>
+      {/*
+       * A label and the copy result, with no rule beneath them: the diagram view has no header
+       * chrome, so giving the source view a bordered bar made the two look like different kinds
+       * of thing. The copy control itself lives in the toolbar, beside zoom and the view switch,
+       * where every other control on a diagram already is.
+       */}
+      <div className={styles.sourceViewBar}>
+        <span className={styles.sourceViewTitle}>{engineName} source</span>
+        {/*
+         * `role="status"` rather than a changing button label: a reader using a screen reader
+         * hears the outcome once, and the button keeps the same accessible name throughout.
+         */}
+        <span className={styles.copyStatus} role="status">
+          {copyState === 'copied' ? 'Copied to clipboard' : null}
+          {copyState === 'failed' ? 'Could not copy — select the text instead' : null}
+        </span>
+      </div>
+      <pre className={styles.sourceCode}>{source}</pre>
+    </div>
   );
 
   return (
@@ -251,66 +358,115 @@ export default function PlantUmlDiagram({
         [DATA_ATTR.theme]: dark ? 'dark' : 'light',
         ...(interactive ? {[DATA_ATTR.interactive]: 'true'} : {}),
         ...(zoom.maximized ? {[DATA_ATTR.maximized]: 'true'} : {}),
+        ...(sourceOpen ? {[DATA_ATTR.sourceOpen]: 'true'} : {}),
       }}
     >
+      {/*
+       * The canvas collapses with `display: none` rather than being unmounted, so
+       * `figure > div[role="img"]` stays the figure's first child — the shape the pre-zoom
+       * markup has always had, which both suites pin. Collapsing rather than hiding is right
+       * here: with no zoom frame there is no box height to preserve, and the source should
+       * take the diagram's place rather than appear below it.
+       */}
       {state.status === 'ready' && state.svg !== null && !interactive && canvas}
+
+      {state.status === 'ready' && state.svg !== null && !interactive && sourceView}
+
+      {/*
+       * With zoom off there is no stage to hang controls on, so the source toggle gets its own
+       * row *after* the canvas — which keeps `figure > div[role="img"]` as the first child, the
+       * shape the pre-zoom markup has always had.
+       *
+       * The label says `source controls`, not just `controls`: a diagram titled "…, no zoom"
+       * would otherwise be given the accessible name "…, no zoom controls", which reads as —
+       * and matches selectors for — the zoom control group it explicitly is not.
+       */}
+      {state.status === 'ready' && state.svg !== null && !interactive && sourceAvailable && (
+        <div className={styles.plainToolbar} role="group" aria-label={`${label} source controls`}>
+          {sourceToggle}
+          {copyControl}
+        </div>
+      )}
 
       {state.status === 'ready' && state.svg !== null && interactive && (
         <div
           ref={zoom.stageRef}
           className={zoom.maximized ? `${styles.stage} ${styles.maximized}` : styles.stage}
         >
-          <div
-            ref={zoom.viewportRef}
-            className={styles.viewport}
-            tabIndex={0}
-            aria-describedby={hintId}
-            aria-keyshortcuts="Plus Minus 0 ArrowUp ArrowDown ArrowLeft ArrowRight"
-            onKeyDown={zoom.onKeyDown}
-            // React renders the initial value so the element is findable by this attribute from the
-            // first paint — it is the selector tests and author CSS use. The hook then owns the value.
-            // React never rewrites an unchanged attribute, so the two do not fight.
-            {...{[DATA_ATTR.zoom]: '1'}}
-          >
-            {/*
-             * The transform layer sits outside the `role="img"` element on purpose: that
-             * element uses `dangerouslySetInnerHTML`, so it cannot have React children, and
-             * `role="img"` makes its whole subtree opaque to assistive technology.
-             */}
-            <div ref={zoom.layerRef} className={styles.layer}>
-              {canvas}
+          {/*
+           * The viewport and the source view share one grid cell, so the source lands exactly
+           * where the picture was, at exactly its size. The viewport is hidden with
+           * `visibility`, not `display`, so it keeps contributing its height — the frame does
+           * not resize when you flip — and the zoom hook's `clientWidth`/`clientHeight`
+           * measurements stay valid for when you flip back.
+           */}
+          <div className={styles.stageBody}>
+            <div
+              ref={zoom.viewportRef}
+              className={
+                sourceOpen ? `${styles.viewport} ${styles.invisibleView}` : styles.viewport
+              }
+              tabIndex={sourceOpen ? -1 : 0}
+              aria-describedby={hintId}
+              aria-keyshortcuts="Plus Minus 0 ArrowUp ArrowDown ArrowLeft ArrowRight"
+              onKeyDown={zoom.onKeyDown}
+              // React renders the initial value so the element is findable by this attribute from the
+              // first paint — it is the selector tests and author CSS use. The hook then owns the value.
+              // React never rewrites an unchanged attribute, so the two do not fight.
+              {...{[DATA_ATTR.zoom]: '1'}}
+            >
+              {/*
+               * The transform layer sits outside the `role="img"` element on purpose: that
+               * element uses `dangerouslySetInnerHTML`, so it cannot have React children, and
+               * `role="img"` makes its whole subtree opaque to assistive technology.
+               */}
+              <div ref={zoom.layerRef} className={styles.layer}>
+                {canvas}
+              </div>
             </div>
+            {sourceView}
           </div>
 
           {/*
            * `role="group"`, not `role="toolbar"`: a toolbar owes readers arrow-key navigation
            * between its buttons, and the arrow keys already pan the diagram.
            */}
+          {/*
+           * The zoom controls are hidden while the source is shown: they would act on a picture
+           * nobody can see. Maximize stays — it is what sizes the frame the source is read in,
+           * and removing it while maximized would strand the reader with no way back but Escape.
+           */}
           <div className={styles.toolbar} role="group" aria-label={`${label} zoom controls`}>
-            <button
-              type="button"
-              className={styles.toolbarButton}
-              aria-label="Zoom out"
-              onClick={zoom.zoomOut}
-            >
-              <span aria-hidden="true">−</span>
-            </button>
-            <button
-              type="button"
-              className={styles.toolbarButton}
-              aria-label="Zoom in"
-              onClick={zoom.zoomIn}
-            >
-              <span aria-hidden="true">+</span>
-            </button>
-            <button
-              type="button"
-              className={styles.toolbarButton}
-              aria-label="Reset zoom"
-              onClick={zoom.reset}
-            >
-              <span aria-hidden="true">⟲</span>
-            </button>
+            {!sourceOpen && (
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label="Zoom out"
+                onClick={zoom.zoomOut}
+              >
+                <span aria-hidden="true">−</span>
+              </button>
+            )}
+            {!sourceOpen && (
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label="Zoom in"
+                onClick={zoom.zoomIn}
+              >
+                <span aria-hidden="true">+</span>
+              </button>
+            )}
+            {!sourceOpen && (
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label="Reset zoom"
+                onClick={zoom.reset}
+              >
+                <span aria-hidden="true">⟲</span>
+              </button>
+            )}
             <button
               type="button"
               className={styles.toolbarButton}
@@ -320,8 +476,14 @@ export default function PlantUmlDiagram({
             >
               <span aria-hidden="true">{zoom.maximized ? '✕' : '⛶'}</span>
             </button>
+            {sourceToggle}
+            {copyControl}
             {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
-            <span ref={zoom.readoutRef} className={styles.readout} aria-hidden="true">
+            <span
+              ref={zoom.readoutRef}
+              className={sourceOpen ? `${styles.readout} ${styles.hiddenView}` : styles.readout}
+              aria-hidden="true"
+            >
               100%
             </span>
           </div>
