@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1]
+
+### Security
+
+- Added `overrides` pinning three transitively-installed packages to patched versions:
+  `serialize-javascript` `>= 7.0.7` (RCE and denial-of-service advisories), `uuid` `>= 11.1.1`
+  (missing buffer bounds check) and `esbuild` `>= 0.28.1` (development-server request
+  handling). `npm audit` now reports no vulnerabilities.
+
+  **This changes nothing for consumers of the package.** All three arrived through build-time
+  tooling — `serialize-javascript` and `uuid` through the `@docusaurus/core` used to build the
+  example site, `esbuild` through `tsup` — and none of them is part of what a reader's browser
+  downloads. npm also ignores an `overrides` block declared by a dependency, so these apply
+  only to this repository's own installs. The plugin's own `copy-webpack-plugin` dependency
+  was already resolving a patched `serialize-javascript`.
+
 ## [1.1.0]
 
 ### Added
@@ -201,7 +217,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.1...v1.0.2

@@ -1,6 +1,6 @@
 {
   "name": "@matfsw/docusaurus-plantuml-plugin",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Render PlantUML diagrams in Docusaurus 3 entirely in the browser - no Java, no PlantUML server, no CDN.",
   "keywords": [
     "docusaurus",
@@ -108,5 +108,10 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.7",
+    "uuid": "^11.1.1",
+    "esbuild": "^0.28.1"
   }
 }
