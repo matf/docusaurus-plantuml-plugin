@@ -1,4 +1,4 @@
-import {useEffect, useId, useRef, useState, type ReactNode} from 'react';
+import {useCallback, useEffect, useId, useRef, useState, type ReactNode} from 'react';
 
 import {useColorMode} from '@docusaurus/theme-common';
 
@@ -31,6 +31,11 @@ export interface PlantUmlDiagramProps {
    * Set from the fence metastring: `zoom` or `zoom=false`.
    */
   zoom?: boolean;
+  /**
+   * Overrides the `showSource` plugin option for this diagram. `undefined` follows the option.
+   * Set from the fence metastring: `showSource` or `showSource=false`.
+   */
+  showSource?: boolean;
 }
 
 /**
@@ -44,6 +49,11 @@ const ENGINE_LABEL: Record<DiagramEngine, string> = {
 
 /** Margin large enough that a diagram is usually ready by the time it is scrolled into view. */
 const LAZY_ROOT_MARGIN = '300px';
+
+/** How long the copy result stays on screen before the control goes quiet again. */
+const COPY_FEEDBACK_MS = 2_000;
+
+type CopyState = 'idle' | 'copied' | 'failed';
 
 interface RenderState {
   status: DiagramStatus;
@@ -84,11 +94,13 @@ export default function PlantUmlDiagram({
   engine = 'plantuml',
   layout,
   zoom: zoomProp,
+  showSource: showSourceProp,
 }: PlantUmlDiagramProps): ReactNode {
   const config = usePlantUmlConfig();
   const {colorMode} = useColorMode();
   const containerRef = useRef<HTMLElement | null>(null);
   const hintId = useId();
+  const sourcePanelId = useId();
 
   const themeOption = config?.options.theme ?? 'auto';
   const dark = themeOption === 'auto' ? colorMode === 'dark' : themeOption === 'dark';
@@ -107,9 +119,46 @@ export default function PlantUmlDiagram({
 
   // A fence flag wins over the plugin option, which in turn wins over the built-in default.
   const interactive = zoomProp ?? config?.options.zoom ?? true;
+  const sourceAvailable = showSourceProp ?? config?.options.showSource ?? true;
 
   const [state, setState] = useState<RenderState>(INITIAL_STATE);
   const [inView, setInView] = useState(!lazy);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const [copyState, setCopyState] = useState<CopyState>('idle');
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // A pending "Copied" message must not fire into an unmounted component.
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
+
+  /**
+   * Copies the source, and says whether it worked.
+   *
+   * `navigator.clipboard` is undefined outside a secure context, which a documentation site
+   * served over plain HTTP genuinely is. Reporting that plainly is better than a control that
+   * silently does nothing — the panel is open, so the reader can still select the text.
+   */
+  const copySource = useCallback(() => {
+    const settle = (next: Exclude<CopyState, 'idle'>) => {
+      setCopyState(next);
+      clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopyState('idle'), COPY_FEEDBACK_MS);
+    };
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+    if (typeof clipboard?.writeText !== 'function') {
+      settle('failed');
+      return;
+    }
+    void clipboard.writeText(source).then(
+      () => settle('copied'),
+      () => settle('failed'),
+    );
+  }, [source]);
+
+  // A diagram whose source changed is a different diagram: an open panel would otherwise keep
+  // showing the old text's copy result, and the reader would have no idea it was stale.
+  useEffect(() => {
+    setCopyState('idle');
+  }, [source]);
 
   // Called unconditionally, as hooks must be; it attaches nothing when not interactive.
   const zoom = useZoomPan({
@@ -238,6 +287,48 @@ export default function PlantUmlDiagram({
     />
   );
 
+  const sourceToggle = sourceAvailable && (
+    <button
+      type="button"
+      className={styles.toolbarButton}
+      aria-label={sourceOpen ? 'Hide diagram source' : 'Show diagram source'}
+      aria-expanded={sourceOpen}
+      aria-controls={sourcePanelId}
+      onClick={() => setSourceOpen((open) => !open)}
+    >
+      <span aria-hidden="true">{'</>'}</span>
+    </button>
+  );
+
+  /**
+   * The source panel sits outside the zoom stage, so zooming and maximizing never move or clip
+   * it, and it reads in document order right after the picture it belongs to.
+   */
+  const sourcePanel = sourceAvailable && sourceOpen && state.status === 'ready' && (
+    <div className={styles.sourcePanel} id={sourcePanelId}>
+      <div className={styles.sourcePanelBar}>
+        <span className={styles.sourcePanelTitle}>{engineName} source</span>
+        {/*
+         * `role="status"` rather than a changing button label: a reader using a screen reader
+         * hears the outcome once, and the button keeps the same accessible name throughout.
+         */}
+        <span className={styles.copyStatus} role="status">
+          {copyState === 'copied' ? 'Copied to clipboard' : null}
+          {copyState === 'failed' ? 'Could not copy — select the text instead' : null}
+        </span>
+        <button
+          type="button"
+          className={styles.copyButton}
+          aria-label={`Copy ${engineName} source to clipboard`}
+          onClick={copySource}
+        >
+          Copy
+        </button>
+      </div>
+      <pre className={styles.sourceCode}>{source}</pre>
+    </div>
+  );
+
   return (
     <figure
       ref={containerRef}
@@ -251,9 +342,25 @@ export default function PlantUmlDiagram({
         [DATA_ATTR.theme]: dark ? 'dark' : 'light',
         ...(interactive ? {[DATA_ATTR.interactive]: 'true'} : {}),
         ...(zoom.maximized ? {[DATA_ATTR.maximized]: 'true'} : {}),
+        ...(sourceOpen ? {[DATA_ATTR.sourceOpen]: 'true'} : {}),
       }}
     >
       {state.status === 'ready' && state.svg !== null && !interactive && canvas}
+
+      {/*
+       * With zoom off there is no stage to hang controls on, so the source toggle gets its own
+       * row *after* the canvas — which keeps `figure > div[role="img"]` as the first child, the
+       * shape the pre-zoom markup has always had.
+       *
+       * The label says `source controls`, not just `controls`: a diagram titled "…, no zoom"
+       * would otherwise be given the accessible name "…, no zoom controls", which reads as —
+       * and matches selectors for — the zoom control group it explicitly is not.
+       */}
+      {state.status === 'ready' && state.svg !== null && !interactive && sourceAvailable && (
+        <div className={styles.plainToolbar} role="group" aria-label={`${label} source controls`}>
+          {sourceToggle}
+        </div>
+      )}
 
       {state.status === 'ready' && state.svg !== null && interactive && (
         <div
@@ -320,6 +427,7 @@ export default function PlantUmlDiagram({
             >
               <span aria-hidden="true">{zoom.maximized ? '✕' : '⛶'}</span>
             </button>
+            {sourceToggle}
             {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
             <span ref={zoom.readoutRef} className={styles.readout} aria-hidden="true">
               100%
@@ -334,6 +442,8 @@ export default function PlantUmlDiagram({
           to pan, and zero to reset.
         </p>
       )}
+
+      {sourcePanel}
 
       {state.status !== 'ready' && state.status !== 'error' && (
         // `aria-busy` on the figure already conveys progress; announcing every phase change

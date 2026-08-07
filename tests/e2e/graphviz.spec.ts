@@ -8,8 +8,8 @@ const ORIGIN = new URL(BASE_URL).origin;
 const diagram = '[data-plantuml-diagram]';
 const graphviz = '[data-diagram-engine="graphviz"]';
 
-/** `docs/graphviz` carries eight DOT fences and one PlantUML fence. */
-const DOT_DIAGRAMS = 8;
+/** `docs/graphviz` carries ten DOT fences and one PlantUML fence. */
+const DOT_DIAGRAMS = 10;
 const TOTAL_DIAGRAMS = DOT_DIAGRAMS + 1;
 
 test.describe('client-side Graphviz rendering', () => {

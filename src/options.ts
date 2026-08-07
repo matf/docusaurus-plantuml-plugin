@@ -86,6 +86,11 @@ export interface PlantUmlPluginOptions {
    * Override for a single fence with `zoom` or `zoom=false` in its metastring.
    */
   zoom?: boolean;
+  /**
+   * Offer a control that reveals the diagram's source and copies it to the clipboard.
+   * Override for a single fence with `showSource` or `showSource=false` in its metastring.
+   */
+  showSource?: boolean;
   /** Graphviz/DOT diagram support. See {@link GraphvizOptions}. */
   graphviz?: GraphvizOptions;
   /** Docusaurus plugin instance id, used when the plugin is registered more than once. */
@@ -120,6 +125,7 @@ export const DEFAULT_OPTIONS: ResolvedPlantUmlOptions = {
   renderTimeoutMs: 20_000,
   cacheMaxEntries: 50,
   zoom: true,
+  showSource: true,
   graphviz: DEFAULT_GRAPHVIZ_OPTIONS,
 };
 
@@ -306,6 +312,7 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
     'renderTimeoutMs',
     'cacheMaxEntries',
     'zoom',
+    'showSource',
     'graphviz',
     // Docusaurus injects `id` for multi-instance plugins.
     'id',
@@ -362,5 +369,6 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
     renderTimeoutMs: validateRenderTimeout(rawOptions.renderTimeoutMs),
     cacheMaxEntries: validateCacheMaxEntries(rawOptions.cacheMaxEntries),
     zoom: validateBoolean(rawOptions.zoom, 'zoom', DEFAULT_OPTIONS.zoom),
+    showSource: validateBoolean(rawOptions.showSource, 'showSource', DEFAULT_OPTIONS.showSource),
   };
 }

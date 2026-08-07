@@ -46,4 +46,6 @@ export const DATA_ATTR = {
   zoom: 'data-plantuml-zoom',
   /** `"true"` on the figure while the diagram fills the browser viewport. */
   maximized: 'data-plantuml-maximized',
+  /** `"true"` on the figure while the source panel is open. */
+  sourceOpen: 'data-plantuml-source-open',
 } as const;

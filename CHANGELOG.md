@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0]
+
+### Added
+
+- **A source view for every rendered diagram.** A `</>` control in the toolbar, beside the zoom
+  buttons, opens a panel below the diagram showing its source exactly as authored, with a button
+  that copies it to the clipboard. Enabled by default; turn it off with `showSource: false`, or
+  per fence with `showSource=false` in the metastring.
+
+  Three details are deliberate:
+  - The panel is a **sibling of the zoom stage**, never a child, so zooming, panning and
+    maximizing cannot move, scale or clip it — and it stays outside the `role="img"` subtree,
+    which is opaque to assistive technology.
+  - The copy result is announced through a `role="status"` region rather than by renaming the
+    button, because a control whose accessible name changes is announced as a new control.
+  - A failed copy says so. `navigator.clipboard` is undefined outside a secure context, which a
+    docs site on plain HTTP genuinely is; the panel is open either way, so the reader can select
+    the text.
+
+- `showSource` plugin option and the matching `showSource` / `showSource=false` fence flag.
+- `data-plantuml-source-open="true"` on the `<figure>` while the panel is open, part of the
+  documented `data-*` contract.
+
+### Changed
+
+- With `zoom: false` the source control gets its own row after the diagram, since there is no
+  zoom toolbar to join. `figure > div[role="img"]` remains the first child, so the shape the
+  pre-zoom markup has always had is unchanged. Setting both `zoom: false` and
+  `showSource: false` restores the bare markup exactly.
+
 ## [1.1.2]
 
 ### Fixed
@@ -247,7 +277,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.3...v1.1.0

@@ -440,6 +440,30 @@ wrapped by a viewport and a transform layer, with the control group as a sibling
 shapes `div[role="img"] > svg` holds, which is what keeps the selector stable for tests and for
 author CSS.
 
+## Source view
+
+The `</>` toolbar control opens a panel holding the diagram's authored source and a copy button.
+Three structural decisions carry the weight:
+
+- **The panel is a sibling of the zoom stage, never a child.** A child would be scaled by the
+  zoom transform, clipped by the `overflow: clip` viewport, and swept into the maximize overlay.
+  As a sibling it is ordinary flow content that zooming cannot touch.
+- **It sits outside the `role="img"` container**, for the same reason the zoom controls do:
+  `role="img"` makes its whole subtree opaque to assistive technology.
+- **The copy outcome goes to a `role="status"` region, not the button's label.** Renaming a
+  control changes its accessible name, and a screen reader announces that as a new control
+  appearing rather than as the result of the action just taken.
+
+Copying uses `navigator.clipboard.writeText`, which is **undefined outside a secure context** —
+a docs site served over plain HTTP. That case is reported rather than swallowed; the panel is
+open regardless, so the reader can select the text by hand. The feedback timer is cleared on
+unmount, and the copy state resets when the diagram source changes so a stale "Copied" can never
+describe text that is no longer on screen.
+
+With `zoom: false` there is no toolbar to join, so the control gets its own row rendered _after_
+the canvas. That ordering is what keeps `figure > div[role="img"]` as the first child — the
+shape the pre-zoom markup has always had, which both the unit and end-to-end suites pin.
+
 ## Zoom and pan
 
 `runtime/` owns rendering; zooming lives entirely in the theme layer, split into

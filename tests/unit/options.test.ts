@@ -20,6 +20,7 @@ describe('plugin option defaults', () => {
       renderTimeoutMs: 20_000,
       cacheMaxEntries: 50,
       zoom: true,
+      showSource: true,
       graphviz: {
         enabled: true,
         languages: ['dot', 'graphviz', 'gv'],
