@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0]
+
+### Added
+
+- **Graphviz/DOT diagrams.** `dot`, `graphviz` and `gv` fences are now laid out by Graphviz in
+  the reader's browser and replaced with SVG, exactly as `plantuml` fences already were. Zoom
+  and pan, lazy rendering, caching, sanitization, the accessible markup and the error panel are
+  all shared with the PlantUML path.
+
+  **This costs no additional bytes.** `@plantuml/core` already bundles `viz-global.js` — Viz.js
+  containing Graphviz — because PlantUML needs it for its own layout, and the plugin has been
+  emitting and loading it since `0.1.0`. Rendering DOT reuses that engine rather than adding a
+  dependency. See [ADR 0004](docs/adr/0004-graphviz-engine-reuse.md).
+
+- A `graphviz` option group: `enabled`, `languages`, `engine`, `allowEngineOverride`,
+  `maxSourceBytes` and `transparentBackground`. Unknown keys inside it are rejected at build
+  time, like unknown keys at the top level.
+
+- Per-fence layout engine selection with `engine=neato` (or `circo`, `fdp`, `twopi`, `sfdp`,
+  `osage`, `patchwork`, `nop`, `nop1`, `nop2`, `dot`) in the fence metastring. Disable with
+  `graphviz.allowEngineOverride: false`.
+
+- Two `data-*` attributes on the diagram `<figure>`: `data-diagram-engine`
+  (`plantuml` | `graphviz`) and `data-diagram-layout` (the Graphviz layout engine, absent on
+  PlantUML diagrams). Both are part of the documented public surface.
+
+- `GraphvizOptions`, `ResolvedGraphvizOptions`, `GraphvizEngine`, `GRAPHVIZ_ENGINES` and
+  `DEFAULT_GRAPHVIZ_OPTIONS` are exported from the package root.
+
+### Changed
+
+- **`dot`, `graphviz` and `gv` fences now render as diagrams instead of as code blocks.** This
+  is the one behaviour change in this release. If you have such fences that are meant to stay
+  code, set `graphviz: {enabled: false}` or narrow `graphviz.languages`.
+
+- **The two runtimes are now loaded independently.** `viz-global.js` (~1.4 MB) and
+  `plantuml.js` (~6.8 MB) previously shared one loader promise, so any diagram fetched both.
+  They are now separate singletons, and a page with only DOT diagrams never downloads the
+  PlantUML engine. Nothing changes for a PlantUML-only page: the same two files load in the
+  same order from the same single `<script>` tag.
+
+- The build now fails with an actionable message if the installed `@plantuml/core` is missing
+  either runtime file, rather than letting a broken install reach a reader's browser as a
+  runtime load failure.
+
+- Progress text, the default accessible label and the error heading name the engine that is
+  actually involved — "Loading Graphviz runtime…", "Graphviz diagram", "Error: Graphviz diagram
+  could not be rendered".
+
+- The missing-plugin-data error panel now says "Diagram plugin data is missing" rather than
+  "PlantUML plugin data is missing", since it applies to both engines.
+
+### Notes
+
+- **Invalid DOT is reported with Graphviz's own diagnostic, including the line number** — for
+  example `syntax error in line 3 near '}'`. PlantUML reports invalid diagrams by rendering an
+  error picture, which the plugin has to detect heuristically
+  ([ADR 0002](docs/adr/0002-render-to-string.md)); Graphviz returns structured errors, so the
+  reader is told exactly what is wrong and where.
+
+- **Graphviz diagrams are not re-rendered on a colour-mode toggle.** Graphviz has no dark
+  theme, so rather than laying the graph out twice, the plugin renders on a transparent
+  background and retargets Graphviz's default black strokes, fills and text at the page's text
+  colour in CSS. Colours set in the DOT source always win, in both modes. As a result the
+  colour mode is absent from the Graphviz cache key and a theme toggle does not disturb a
+  reader's zoom.
+
+- **`graphviz.maxSourceBytes` defaults to 100 000.** Graphviz lays out synchronously: a
+  300-edge graph renders in ~26 ms, but a 3 000-edge graph takes ~2.25 s and visibly freezes the
+  page. Oversized sources are refused with an explanatory panel, before the engine is even
+  downloaded.
+
+- Rendering remains 100% same-origin and client-side. No CDN, no rendering service, no
+  `unsafe-eval`, and no Graphviz installation on the build machine or the reader's.
+
 ## [1.0.3]
 
 ### Security
@@ -126,7 +201,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.0.0...v1.0.1

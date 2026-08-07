@@ -46,11 +46,13 @@ in scope.
 
 ### Nothing leaves the browser
 
-Rendering is entirely client-side and same-origin. Diagram source is never transmitted to
-plantuml.com, to a Kroki instance, or to any other service, and there is no configuration that
-would make it do so. The PlantUML engine (`viz-global.js` and `plantuml.js`) is copied out of
-the installed `@plantuml/core` dependency into your own build output and served from your own
-origin under your `baseUrl` — never from a CDN.
+Rendering is entirely client-side and same-origin, for **both** the PlantUML and the Graphviz
+engine. Diagram source is never transmitted to plantuml.com, to a Kroki instance, or to any
+other service, and there is no configuration that would make it do so. Both engines
+(`viz-global.js`, which is Graphviz, and `plantuml.js`) are copied out of the installed
+`@plantuml/core` dependency into your own build output and served from your own origin under
+your `baseUrl` — never from a CDN. `viz-global.js` embeds its WebAssembly inline, so it does
+not fetch a side-car `.wasm` from anywhere either.
 
 ### Zooming never touches the sanitized markup
 
@@ -61,13 +63,21 @@ markup is the mutation-XSS shape this deliberately avoids. See
 
 ### Rendered SVG is treated as untrusted
 
-PlantUML output is generated from author-controlled diagram source, and diagram source can
-express markup. By default (`sanitizeSvg: true`) every rendered SVG passes through DOMPurify
-with `USE_PROFILES: {svg: true, svgFilters: true}` before it reaches the DOM, with
-`foreignObject`, `script`, `iframe`, `object`, `embed`, `audio` and `video` additionally
-forbidden. Event-handler attributes and `javascript:` URLs are removed. `foreignObject` is
-singled out because it is the one SVG element that can host arbitrary HTML — allowing it would
-reinstate the injection surface the SVG profile exists to remove.
+Engine output is generated from author-controlled diagram source, and diagram source can
+express markup. By default (`sanitizeSvg: true`) every rendered SVG — from either engine —
+passes through DOMPurify with `USE_PROFILES: {svg: true, svgFilters: true}` before it reaches
+the DOM, with `foreignObject`, `script`, `iframe`, `object`, `embed`, `audio` and `video`
+additionally forbidden. Event-handler attributes and `javascript:` URLs are removed.
+`foreignObject` is singled out because it is the one SVG element that can host arbitrary HTML —
+allowing it would reinstate the injection surface the SVG profile exists to remove.
+
+Two Graphviz-specific notes, both verified by tests rather than assumed:
+
+- Graphviz renders HTML-like labels (`label=<<table>…>`) to native SVG `<text>`, **not** to
+  `<foreignObject>`, so forbidding that element costs no Graphviz functionality.
+- DOT's `URL` and `href` attributes emit real `<a>` links into the SVG. Ordinary and relative
+  links survive; `javascript:` — plain, entity-encoded or whitespace-padded, in either `href` or
+  `xlink:href` — does not.
 
 If sanitization leaves no `<svg>` root, the plugin raises an error rather than inserting the
 result.
@@ -75,7 +85,7 @@ result.
 ### `sanitizeSvg: false` is out of scope
 
 Disabling sanitization is a documented, deliberate opt-out. With it off, any HTML or
-JavaScript that a diagram author can express in PlantUML's output is injected into the page
+JavaScript that a diagram author can express in either engine's output is injected into the page
 verbatim and runs with your site's origin, cookies and storage. That is the stated behaviour
 of the option, so a report demonstrating script execution with `sanitizeSvg: false` is not a
 vulnerability in this plugin.
@@ -98,13 +108,15 @@ it.
 
 ### Out of scope
 
-- Vulnerabilities in `@plantuml/core` itself or in the PlantUML language. Report those
-  upstream; we will pick up a fixed release.
+- Vulnerabilities in `@plantuml/core` itself, in the PlantUML language, or in the Viz.js /
+  Graphviz build it bundles. Report those upstream; we will pick up a fixed release.
 - Vulnerabilities in Docusaurus, React or DOMPurify. Same — report upstream. If a fixed
   version requires a change here, tell us and we will make it.
-- Denial of service through a deliberately pathological diagram. Rendering is serialized and
-  bounded by `renderTimeoutMs`, and a diagram that exhausts that budget produces a contained
-  error panel; a slow diagram in your own documentation is a content problem.
+- Denial of service through a deliberately pathological diagram. PlantUML rendering is
+  serialized and bounded by `renderTimeoutMs`, and a diagram that exhausts that budget produces
+  a contained error panel. Graphviz lays out synchronously, so a very large graph stalls the
+  tab instead; `graphviz.maxSourceBytes` bounds that, and it is checked before the engine is
+  even loaded. Either way, a slow diagram in your own documentation is a content problem.
 - Missing hardening headers on a site that embeds this plugin. Content Security Policy is the
   site's responsibility; see the CSP section of the README for what this plugin needs.
 - Findings that require `sanitizeSvg: false`, as described above.

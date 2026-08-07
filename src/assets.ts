@@ -41,12 +41,32 @@ export function locatePlantUmlCore(): PlantUmlCoreLocation {
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as CorePackageJson;
   const version = typeof packageJson.version === 'string' ? packageJson.version : '0.0.0';
 
-  return {
-    packageDir,
-    version,
-    files: [
-      path.join(packageDir, VIZ_SCRIPT_FILENAME),
-      path.join(packageDir, PLANTUML_MODULE_FILENAME),
-    ],
-  };
+  const files = [
+    path.join(packageDir, VIZ_SCRIPT_FILENAME),
+    path.join(packageDir, PLANTUML_MODULE_FILENAME),
+  ];
+  files.forEach((file) => assertRuntimeFile(file, version));
+
+  return {packageDir, version, files};
+}
+
+/**
+ * Fails the build if a runtime asset is missing from the installed `@plantuml/core`.
+ *
+ * `viz-global.js` matters twice over: PlantUML needs it for layout, and it *is* the Graphviz
+ * engine this plugin renders DOT fences with. It is a declared `exports` entry of
+ * `@plantuml/core`, not a private file — but it is still shipped at PlantUML's discretion, so a
+ * routine dependency bump that dropped or renamed it would otherwise reach a reader's browser
+ * as a runtime load failure. Checking here turns that into a failed build with a name attached.
+ *
+ * See `docs/adr/0004-graphviz-engine-reuse.md`.
+ */
+function assertRuntimeFile(file: string, version: string): void {
+  if (fs.existsSync(file)) return;
+  throw new Error(
+    `[${PLUGIN_NAME}] '@plantuml/core@${version}' does not contain '${path.basename(file)}', ` +
+      'which this plugin serves as a runtime asset. This means the installed version of ' +
+      '@plantuml/core is not one this plugin supports. Pin a supported version, or open an ' +
+      'issue if the package has genuinely changed its layout.',
+  );
 }

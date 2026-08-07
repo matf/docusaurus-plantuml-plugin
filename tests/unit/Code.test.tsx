@@ -11,17 +11,23 @@ vi.mock('@theme/PlantUmlDiagram', () => ({
     source,
     title,
     language,
+    engine,
+    layout,
     zoom,
   }: {
     source: string;
     title?: string;
     language?: string;
+    engine?: string;
+    layout?: string;
     zoom?: boolean;
   }) => (
     <div
       data-testid="diagram"
       data-title={title}
       data-language={language}
+      data-engine={engine}
+      data-layout={layout ?? 'inherit'}
       data-zoom={zoom === undefined ? 'inherit' : String(zoom)}
     >
       {source}
@@ -173,5 +179,112 @@ describe('delegating everything else', () => {
       </Code>,
     );
     expect(originalCodeCalls[0]).toMatchObject({title: 'from-prop', language: 'js'});
+  });
+});
+
+const DOT = 'digraph {\n  a -> b\n}\n';
+
+describe('intercepting Graphviz fences', () => {
+  it('renders a diagram for a dot fence', () => {
+    render(<Code className="language-dot">{DOT}</Code>);
+
+    const diagram = screen.getByTestId('diagram');
+    expect(diagram).toHaveTextContent('a -> b');
+    expect(diagram).toHaveAttribute('data-engine', 'graphviz');
+    expect(diagram).toHaveAttribute('data-language', 'dot');
+    expect(originalCodeCalls).toHaveLength(0);
+  });
+
+  it('renders a diagram for the graphviz and gv aliases', () => {
+    render(<Code className="language-graphviz">{DOT}</Code>);
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-engine', 'graphviz');
+
+    render(<Code className="language-gv">{DOT}</Code>);
+    expect(screen.getAllByTestId('diagram')[1]).toHaveAttribute('data-engine', 'graphviz');
+  });
+
+  it('matches the language case-insensitively', () => {
+    render(<Code className="language-DOT">{DOT}</Code>);
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-engine', 'graphviz');
+  });
+
+  it('marks a PlantUML fence as the PlantUML engine', () => {
+    render(<Code className="language-plantuml">{DIAGRAM}</Code>);
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-engine', 'plantuml');
+  });
+
+  it('passes a layout engine chosen on the fence', () => {
+    render(
+      <Code className="language-dot" metastring="engine=neato">
+        {DOT}
+      </Code>,
+    );
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-layout', 'neato');
+  });
+
+  it('leaves the layout to the plugin option when the fence names none', () => {
+    render(<Code className="language-dot">{DOT}</Code>);
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-layout', 'inherit');
+  });
+
+  it('never passes a layout for a PlantUML fence', () => {
+    // `engine=` is meaningless to PlantUML; reading it there would only invite confusion.
+    render(
+      <Code className="language-plantuml" metastring="engine=neato">
+        {DIAGRAM}
+      </Code>,
+    );
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-layout', 'inherit');
+  });
+
+  it('honours the zoom fence flag on a DOT fence too', () => {
+    render(
+      <Code className="language-dot" metastring="zoom=false">
+        {DOT}
+      </Code>,
+    );
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-zoom', 'false');
+  });
+
+  it('reads the title from a DOT fence', () => {
+    render(
+      <Code className="language-dot" metastring='title="Build pipeline"'>
+        {DOT}
+      </Code>,
+    );
+    expect(screen.getByTestId('diagram')).toHaveAttribute('data-title', 'Build pipeline');
+  });
+
+  it('delegates a dot fence when Graphviz support is switched off', () => {
+    setStubOptions({
+      graphviz: {
+        enabled: false,
+        languages: ['dot', 'graphviz', 'gv'],
+        engine: 'dot',
+        allowEngineOverride: true,
+        maxSourceBytes: 100_000,
+        transparentBackground: true,
+      },
+    });
+
+    render(<Code className="language-dot">{DOT}</Code>);
+    expect(screen.queryByTestId('diagram')).toBeNull();
+    expect(originalCodeCalls).toHaveLength(1);
+  });
+
+  it('delegates a language neither engine claims', () => {
+    render(<Code className="language-mermaid">{'graph TD;\n'}</Code>);
+    expect(screen.queryByTestId('diagram')).toBeNull();
+    expect(originalCodeCalls).toHaveLength(1);
+  });
+
+  it('delegates a JSX-authored dot block rather than guessing its source', () => {
+    render(
+      <Code className="language-dot">
+        <span>digraph {'{}'}</span>
+      </Code>,
+    );
+    expect(screen.queryByTestId('diagram')).toBeNull();
+    expect(originalCodeCalls).toHaveLength(1);
   });
 });

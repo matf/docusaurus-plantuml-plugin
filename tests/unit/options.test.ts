@@ -1,6 +1,11 @@
 import {describe, expect, it} from 'vitest';
 
-import {DEFAULT_OPTIONS, PlantUmlOptionsError, resolveOptions} from '../../src/options.js';
+import {
+  DEFAULT_OPTIONS,
+  GRAPHVIZ_ENGINES,
+  PlantUmlOptionsError,
+  resolveOptions,
+} from '../../src/options.js';
 import plantumlPlugin, {validateOptions} from '../../src/index.js';
 
 describe('plugin option defaults', () => {
@@ -15,6 +20,14 @@ describe('plugin option defaults', () => {
       renderTimeoutMs: 20_000,
       cacheMaxEntries: 50,
       zoom: true,
+      graphviz: {
+        enabled: true,
+        languages: ['dot', 'graphviz', 'gv'],
+        engine: 'dot',
+        allowEngineOverride: true,
+        maxSourceBytes: 100_000,
+        transparentBackground: true,
+      },
     });
   });
 
@@ -128,5 +141,114 @@ describe('plugin factory', () => {
 
   it('points the theme path at the compiled theme directory', () => {
     expect(plantumlPlugin(context, {}).getThemePath?.()).toMatch(/theme$/);
+  });
+});
+
+describe('graphviz options', () => {
+  it('defaults to the three usual DOT fence languages', () => {
+    expect(resolveOptions({}).graphviz).toEqual({
+      enabled: true,
+      languages: ['dot', 'graphviz', 'gv'],
+      engine: 'dot',
+      allowEngineOverride: true,
+      maxSourceBytes: 100_000,
+      transparentBackground: true,
+    });
+  });
+
+  it('keeps user values and fills the rest from defaults', () => {
+    const {graphviz} = resolveOptions({graphviz: {engine: 'neato', languages: ['DOT']}});
+    expect(graphviz.engine).toBe('neato');
+    // Normalized to lower case, exactly as the top-level `languages` option is.
+    expect(graphviz.languages).toEqual(['dot']);
+    expect(graphviz.allowEngineOverride).toBe(true);
+  });
+
+  it('does not share the default languages array between calls', () => {
+    resolveOptions(undefined).graphviz.languages.push('mutated');
+    expect(resolveOptions(undefined).graphviz.languages).toEqual(['dot', 'graphviz', 'gv']);
+  });
+
+  it('rejects an unknown nested key rather than ignoring a typo', () => {
+    expect(() => resolveOptions({graphviz: {enigne: 'neato'}})).toThrow(PlantUmlOptionsError);
+    expect(() => resolveOptions({graphviz: {enigne: 'neato'}})).toThrow(/graphviz\.enigne/);
+  });
+
+  it('rejects a layout engine Graphviz does not have', () => {
+    expect(() => resolveOptions({graphviz: {engine: 'spring'}})).toThrow(
+      /options\.graphviz\.engine must be one of/,
+    );
+  });
+
+  it('accepts every engine the bundled build ships', () => {
+    GRAPHVIZ_ENGINES.forEach((engine) => {
+      expect(resolveOptions({graphviz: {engine}}).graphviz.engine).toBe(engine);
+    });
+  });
+
+  it('rejects a non-object graphviz group', () => {
+    expect(() => resolveOptions({graphviz: 'yes'})).toThrow(/options\.graphviz must be an object/);
+  });
+
+  it('rejects a non-boolean flag', () => {
+    expect(() => resolveOptions({graphviz: {enabled: 'yes'}})).toThrow(
+      /options\.graphviz\.enabled must be a boolean/,
+    );
+  });
+
+  it('rejects an empty or malformed language list', () => {
+    expect(() => resolveOptions({graphviz: {languages: []}})).toThrow(
+      /options\.graphviz\.languages must contain at least one language/,
+    );
+    expect(() => resolveOptions({graphviz: {languages: ['dot', 'dot']}})).toThrow(
+      /options\.graphviz\.languages contains duplicate entries/,
+    );
+    expect(() => resolveOptions({graphviz: {languages: [42]}})).toThrow(
+      /options\.graphviz\.languages\[0\] must be a non-empty string/,
+    );
+  });
+
+  it('rejects a maxSourceBytes that is not a positive integer', () => {
+    expect(() => resolveOptions({graphviz: {maxSourceBytes: 0}})).toThrow(
+      /must be a positive integer/,
+    );
+    expect(() => resolveOptions({graphviz: {maxSourceBytes: 1.5}})).toThrow(
+      /must be a positive integer/,
+    );
+  });
+
+  it('refuses a language claimed by both engines', () => {
+    // A fence has one language, so letting both engines claim it would make the output depend
+    // on the order the wrapper happens to check them in.
+    expect(() => resolveOptions({languages: ['dot'], graphviz: {languages: ['dot']}})).toThrow(
+      /both claim 'dot'/,
+    );
+  });
+
+  it('allows an overlap when Graphviz is switched off', () => {
+    const resolved = resolveOptions({
+      languages: ['dot'],
+      graphviz: {enabled: false, languages: ['dot']},
+    });
+    expect(resolved.languages).toEqual(['dot']);
+    expect(resolved.graphviz.enabled).toBe(false);
+  });
+
+  it('reaches the build through validateOptions', () => {
+    expect(() => validateOptions({options: {graphviz: {engine: 'nope' as never}}})).toThrow(
+      PlantUmlOptionsError,
+    );
+  });
+
+  it('publishes the graphviz group to the browser', () => {
+    const plugin = plantumlPlugin({siteDir: '/tmp'} as never, {graphviz: {engine: 'twopi'}});
+    let published: {options?: {graphviz?: unknown}} | undefined;
+    void plugin.contentLoaded?.({
+      content: undefined,
+      actions: {setGlobalData: (data: never) => (published = data)},
+      allContent: {},
+    } as never);
+
+    expect(published?.options?.graphviz).toMatchObject({engine: 'twopi', enabled: true});
   });
 });

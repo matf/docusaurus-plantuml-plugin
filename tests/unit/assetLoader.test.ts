@@ -1,8 +1,10 @@
-import {describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {
   isRuntimeRequested,
+  isVizRuntimeRequested,
   loadPlantUmlRuntime,
+  loadVizRuntime,
   resetRuntimeLoader,
 } from '../../src/runtime/assetLoader.js';
 import {PlantUmlError} from '../../src/runtime/errors.js';
@@ -10,6 +12,30 @@ import {PlantUmlError} from '../../src/runtime/errors.js';
 const ASSETS = '/plantuml-test/assets/plantuml-client-1.2026.6';
 
 const fakeEngine = {render: () => {}, renderToString: () => {}};
+
+/** Minimal stand-in for the `window.Viz` that `viz-global.js` installs. */
+function installFakeViz(overrides: Record<string, unknown> = {}): {
+  instance: ReturnType<typeof vi.fn>;
+} {
+  const vizInstance = {
+    render: vi.fn(),
+    engines: ['dot', 'neato'],
+    graphvizVersion: '14.1.1',
+  };
+  const viz = {
+    instance: vi.fn().mockResolvedValue(vizInstance),
+    engines: ['dot', 'neato'],
+    formats: ['svg'],
+    graphvizVersion: '14.1.1',
+    ...overrides,
+  };
+  vi.stubGlobal('Viz', viz);
+  return viz;
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function injectedScripts(): HTMLScriptElement[] {
   return Array.from(document.querySelectorAll('script[data-plantuml-runtime]'));
@@ -142,7 +168,7 @@ describe('runtime load failures', () => {
     });
     await settleScript('error');
 
-    await expect(loading).rejects.toThrow(/Failed to load the PlantUML Graphviz runtime/);
+    await expect(loading).rejects.toThrow(/Failed to load the Graphviz runtime/);
     await expect(loading).rejects.toThrow(/viz-global\.js/);
     await expect(loading).rejects.toThrow(/baseUrl/);
   });
@@ -204,6 +230,99 @@ describe('runtime load failures', () => {
     await settleScript('load');
 
     await expect(loading).rejects.toThrow(/does not export the expected PlantUML render functions/);
+  });
+});
+
+describe('the Graphviz runtime', () => {
+  it('loads viz-global.js and resolves an engine instance', async () => {
+    const viz = installFakeViz();
+    const loading = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+
+    await settleScript('load');
+    const instance = await loading;
+
+    expect(injectedScripts()[0]?.src).toContain(`${ASSETS}/viz-global.js`);
+    expect(viz.instance).toHaveBeenCalledTimes(1);
+    expect(instance.engines).toContain('dot');
+  });
+
+  it('never downloads the 6.8 MB PlantUML engine for a DOT-only page', async () => {
+    // The whole point of splitting the loader: a site that uses only Graphviz must not pay
+    // for PlantUML. One injected script, and no dynamic import at all.
+    installFakeViz();
+    const loading = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+    await settleScript('load');
+    await loading;
+
+    expect(injectedScripts()).toHaveLength(1);
+    expect(isVizRuntimeRequested()).toBe(true);
+    expect(isRuntimeRequested()).toBe(false);
+  });
+
+  it('shares one instance across concurrent callers', async () => {
+    const viz = installFakeViz();
+    const first = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+    const second = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+    await settleScript('load');
+
+    expect(await first).toBe(await second);
+    expect(viz.instance).toHaveBeenCalledTimes(1);
+    expect(injectedScripts()).toHaveLength(1);
+  });
+
+  it('rejects a script that did not install the expected Viz API', async () => {
+    // The §8.1 mitigation: `viz-global.js` arrives via @plantuml/core, so a future release
+    // that changed engines must fail with a message naming the cause.
+    installFakeViz({instance: undefined});
+    const loading = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+    await settleScript('load');
+
+    await expect(loading).rejects.toThrow(/did not install the expected Graphviz \(Viz\.js\) API/);
+    await expect(loading).rejects.toMatchObject({kind: 'load'});
+  });
+
+  it('rejects when window.Viz is missing entirely', async () => {
+    vi.stubGlobal('Viz', undefined);
+    const loading = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+    await settleScript('load');
+
+    await expect(loading).rejects.toThrow(/did not install the expected Graphviz/);
+  });
+
+  it('lets a later diagram retry after a failed load', async () => {
+    installFakeViz();
+    const failing = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+    await settleScript('error');
+    await expect(failing).rejects.toThrow(/Failed to load the Graphviz runtime/);
+    expect(isVizRuntimeRequested()).toBe(false);
+
+    resetRuntimeLoader();
+    const retry = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+    await settleScript('load');
+    await expect(retry).resolves.toMatchObject({graphvizVersion: '14.1.1'});
+  });
+
+  it('surfaces a rejecting Viz.instance() as a load error', async () => {
+    installFakeViz({instance: vi.fn().mockRejectedValue(new Error('wasm refused to compile'))});
+    const loading = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+    await settleScript('load');
+
+    await expect(loading).rejects.toThrow(/Failed to initialize the Graphviz engine/);
+    await expect(loading).rejects.toMatchObject({kind: 'load'});
+  });
+
+  it('reuses the one script tag when both engines are used on a page', async () => {
+    const viz = installFakeViz();
+    const importModule = vi.fn().mockResolvedValue(fakeEngine);
+    const graphviz = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
+    const plantuml = loadPlantUmlRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000, importModule});
+
+    await settleScript('load');
+    await Promise.all([graphviz, plantuml]);
+
+    expect(injectedScripts()).toHaveLength(1);
+    expect(viz.instance).toHaveBeenCalledTimes(1);
+    expect(importModule).toHaveBeenCalledTimes(1);
   });
 });
 

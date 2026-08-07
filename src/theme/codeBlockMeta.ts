@@ -92,6 +92,28 @@ export function parseBooleanMeta(props: CodeBlockProps, key: string): boolean | 
   return undefined;
 }
 
+/**
+ * Reads a `key=value` pair from the fence metastring, accepting `engine=neato`,
+ * `engine="neato"` and `engine='neato'` alike.
+ *
+ * Unlike {@link parseBooleanMeta} this runs against the raw metastring, because the value it
+ * is looking for may itself be the quoted part. Returns `undefined` when the key is absent or
+ * carries no value, which the caller reads as "fall back to the plugin option".
+ */
+export function parseStringMeta(props: CodeBlockProps, key: string): string | undefined {
+  const metastring = props.metastring;
+  if (typeof metastring !== 'string' || metastring === '') return undefined;
+
+  // Word boundaries by hand, matching parseBooleanMeta: `subengine=` must not match `engine`.
+  const pattern = new RegExp(`(?:^|\\s)${key}=(?:"([^"]*)"|'([^']*)'|(\\S+))(?=\\s|$)`, 'i');
+  const match = pattern.exec(metastring);
+  if (!match) return undefined;
+
+  const value = match[1] ?? match[2] ?? match[3];
+  const trimmed = value?.trim();
+  return trimmed !== undefined && trimmed !== '' ? trimmed : undefined;
+}
+
 /** Reads `title="..."` (or `title='...'`) from the fence metastring. */
 export function parseTitle(props: CodeBlockProps): string | undefined {
   if (typeof props.title === 'string' && props.title !== '') return props.title;

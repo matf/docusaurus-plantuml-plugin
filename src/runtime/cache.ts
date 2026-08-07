@@ -49,6 +49,39 @@ export function computeCacheKey({source, dark, sanitized, coreVersion}: CacheKey
   return `${coreVersion}|${mode}|${clean}|${source.length}|${hash(source)}`;
 }
 
+export interface GraphvizCacheKeyInput {
+  source: string;
+  /** Graphviz layout engine; `dot` and `neato` draw different pictures from one source. */
+  layout: string;
+  sanitized: boolean;
+  transparentBackground: boolean;
+  /**
+   * `@plantuml/core` version. The Graphviz build is bundled inside that package, so its
+   * version is what changes when the engine changes — and unlike `Viz.graphvizVersion` it is
+   * known before the engine has loaded, which is what lets a cache hit skip loading entirely.
+   */
+  coreVersion: string;
+}
+
+/**
+ * Cache key for a Graphviz diagram.
+ *
+ * The colour mode is deliberately **absent**: Graphviz output is colour-mode independent and
+ * adapts through CSS rather than through a re-render, so one entry serves both modes. The
+ * `graphviz|` prefix keeps these entries in a separate namespace from PlantUML's.
+ */
+export function computeGraphvizCacheKey({
+  source,
+  layout,
+  sanitized,
+  transparentBackground,
+  coreVersion,
+}: GraphvizCacheKeyInput): string {
+  const clean = sanitized ? 'san' : 'raw';
+  const background = transparentBackground ? 'bg-none' : 'bg-default';
+  return `graphviz|${coreVersion}|${layout}|${background}|${clean}|${source.length}|${hash(source)}`;
+}
+
 class MemoryCache implements DiagramCache {
   readonly mode: CacheMode = 'memory';
   readonly #entries = new Map<string, string>();

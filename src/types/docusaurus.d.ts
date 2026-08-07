@@ -27,6 +27,8 @@ declare module '@theme/PlantUmlDiagram' {
     source: string;
     title?: string;
     language?: string;
+    engine?: 'plantuml' | 'graphviz';
+    layout?: string;
     zoom?: boolean;
   }
 

@@ -54,6 +54,12 @@ const config: Config = {
         sanitizeSvg: true,
         showSourceOnError: true,
         renderTimeoutMs: 20_000,
+        graphviz: {
+          enabled: true,
+          languages: ['dot', 'graphviz', 'gv'],
+          engine: 'dot',
+          allowEngineOverride: true,
+        },
       } satisfies PlantUmlPluginOptions,
     ],
   ],

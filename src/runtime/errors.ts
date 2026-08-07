@@ -1,4 +1,7 @@
-export type PlantUmlErrorKind = 'load' | 'engine' | 'diagram' | 'timeout' | 'config' | 'aborted';
+import type {VizRenderError} from './types.js';
+
+export type PlantUmlErrorKind =
+  'load' | 'engine' | 'diagram' | 'syntax' | 'timeout' | 'config' | 'aborted' | 'too-large';
 
 /** Every failure surfaced to the UI is one of these, so the panel can explain what broke. */
 export class PlantUmlError extends Error {
@@ -115,4 +118,38 @@ export function describeEngineError(raw: unknown): string {
  */
 export function toError(value: unknown): Error {
   return value instanceof Error ? value : new PlantUmlError('engine', describeEngineError(value));
+}
+
+const GRAPHVIZ_UNKNOWN_ERROR = 'Graphviz rejected this diagram without reporting a reason.';
+
+/**
+ * Joins Graphviz's own diagnostics into one message.
+ *
+ * Unlike PlantUML, Graphviz reports failures as structured data rather than as a rendered
+ * error picture, so the reader can be shown exactly what the engine said — typically
+ * `syntax error in line 3 near '}'`. Warnings are dropped here: they accompany *successful*
+ * renders and must not be presented as failures.
+ */
+export function formatGraphvizErrors(errors: readonly VizRenderError[]): string {
+  const messages = errors
+    .filter((entry) => entry.level !== 'warning')
+    .map((entry) => entry.message.trim())
+    .filter((message) => message.length > 0);
+  // A failure with only warning-level diagnostics still failed; show them rather than nothing.
+  const fallback = errors
+    .map((entry) => entry.message.trim())
+    .filter((message) => message.length > 0);
+  const chosen = messages.length > 0 ? messages : fallback;
+  return chosen.length > 0 ? [...new Set(chosen)].join('\n') : GRAPHVIZ_UNKNOWN_ERROR;
+}
+
+/**
+ * Extracts the 1-based source line from a Graphviz diagnostic, so the error panel can point
+ * at the offending line of the fence. Returns `null` when no line is named.
+ */
+export function graphvizErrorLine(message: string): number | null {
+  const match = /\bin line (\d+)\b/i.exec(message);
+  if (!match?.[1]) return null;
+  const line = Number.parseInt(match[1], 10);
+  return Number.isInteger(line) && line > 0 ? line : null;
 }

@@ -74,3 +74,26 @@ export async function waitForDiagrams(page: Page, expected: number): Promise<voi
     {timeout: 90_000},
   );
 }
+
+/**
+ * Scrolls the whole page so that every lazily-rendered diagram enters the viewport, then
+ * returns to the top.
+ *
+ * With `lazy: true` — the default — a diagram below the fold stays `idle` until it nears the
+ * viewport, so a page taller than the window never renders all of its diagrams on load. Tests
+ * that assert on every diagram have to walk the page the way a reader would.
+ *
+ * The step is smaller than the viewport so no diagram can be skipped over between observations.
+ */
+export async function revealLazyDiagrams(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const step = Math.round(window.innerHeight * 0.75);
+    for (let y = 0; y < document.body.scrollHeight; y += step) {
+      window.scrollTo(0, y);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    window.scrollTo(0, document.body.scrollHeight);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    window.scrollTo(0, 0);
+  });
+}

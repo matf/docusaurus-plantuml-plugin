@@ -6,6 +6,7 @@ import {
   extractSource,
   isPlantUmlLanguage,
   parseBooleanMeta,
+  parseStringMeta,
   parseTitle,
 } from '../../src/theme/codeBlockMeta.js';
 
@@ -164,5 +165,54 @@ describe('boolean fence flags', () => {
 
   it('reads a flag other than zoom', () => {
     expect(parseBooleanMeta({metastring: 'foo=false'}, 'foo')).toBe(false);
+  });
+});
+
+describe('parseStringMeta', () => {
+  const meta = (metastring: string) => ({metastring});
+
+  it('reads a bare value', () => {
+    expect(parseStringMeta(meta('engine=neato'), 'engine')).toBe('neato');
+  });
+
+  it('reads a double-quoted value', () => {
+    expect(parseStringMeta(meta('engine="neato"'), 'engine')).toBe('neato');
+  });
+
+  it('reads a single-quoted value', () => {
+    expect(parseStringMeta(meta("engine='twopi'"), 'engine')).toBe('twopi');
+  });
+
+  it('finds the key among other metadata', () => {
+    expect(parseStringMeta(meta('title="A graph" engine=circo zoom=false'), 'engine')).toBe(
+      'circo',
+    );
+  });
+
+  it('returns undefined when the key is absent', () => {
+    expect(parseStringMeta(meta('title="A graph"'), 'engine')).toBeUndefined();
+  });
+
+  it('returns undefined for an empty metastring', () => {
+    expect(parseStringMeta(meta(''), 'engine')).toBeUndefined();
+    expect(parseStringMeta({}, 'engine')).toBeUndefined();
+  });
+
+  it('returns undefined when the key carries no value', () => {
+    expect(parseStringMeta(meta('engine='), 'engine')).toBeUndefined();
+    expect(parseStringMeta(meta('engine=""'), 'engine')).toBeUndefined();
+  });
+
+  it('respects word boundaries so a longer key cannot match', () => {
+    expect(parseStringMeta(meta('subengine=neato'), 'engine')).toBeUndefined();
+  });
+
+  it('does not read a value out of a quoted title', () => {
+    // `title="engine=neato"` is prose, not a flag; the whole quoted run belongs to `title`.
+    expect(parseStringMeta(meta('title="engine=neato"'), 'engine')).toBeUndefined();
+  });
+
+  it('is case-insensitive about the key, like the boolean parser', () => {
+    expect(parseStringMeta(meta('Engine=fdp'), 'engine')).toBe('fdp');
   });
 });
