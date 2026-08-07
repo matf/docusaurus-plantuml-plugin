@@ -30,10 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     select the text.
 
 - `showSource` plugin option and the matching `showSource` / `showSource=false` fence flag.
-- `data-plantuml-source-open="true"` on the `<figure>` while the panel is open, part of the
+- `data-plantuml-source-open="true"` on the `<figure>` while the source is shown, part of the
   documented `data-*` contract.
 
 ### Changed
+
+- The zoom controls are hidden while the source is shown — they would act on a picture nobody
+  can see. **Maximize stays**, because it sizes the frame the source is read in and removing it
+  while maximized would leave Escape as the only way back out.
 
 - With `zoom: false` the source control gets its own row after the diagram, since there is no
   zoom toolbar to join. `figure > div[role="img"]` remains the first child, so the shape the
