@@ -12,19 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **A source view for every rendered diagram.** A `</>` control in the toolbar, beside the zoom
-  buttons, opens a panel below the diagram showing its source exactly as authored, with a button
-  that copies it to the clipboard. Enabled by default; turn it off with `showSource: false`, or
-  per fence with `showSource=false` in the metastring.
+  buttons, **flips the frame**: the source takes the diagram's place, in the same box, with a
+  button that copies it to the clipboard. Enabled by default; turn it off with
+  `showSource: false`, or per fence with `showSource=false` in the metastring.
 
-  Three details are deliberate:
-  - The panel is a **sibling of the zoom stage**, never a child, so zooming, panning and
-    maximizing cannot move, scale or clip it — and it stays outside the `role="img"` subtree,
-    which is opaque to assistive technology.
+  Four details are deliberate:
+  - **It shares the diagram's frame rather than sitting below it.** Below the diagram it had two
+    failure modes: a diagram taller than the window pushed it off-screen, and while maximized it
+    was painted behind the full-screen overlay. Sharing the frame removes both by construction.
+  - **The diagram is hidden, not unmounted**, so the frame keeps its height — nothing on the page
+    moves when you flip — and the reader's zoom and pan survive the round trip.
   - The copy result is announced through a `role="status"` region rather than by renaming the
     button, because a control whose accessible name changes is announced as a new control.
   - A failed copy says so. `navigator.clipboard` is undefined outside a secure context, which a
-    docs site on plain HTTP genuinely is; the panel is open either way, so the reader can select
-    the text.
+    docs site on plain HTTP genuinely is; the source is on screen either way, so the reader can
+    select the text.
 
 - `showSource` plugin option and the matching `showSource` / `showSource=false` fence flag.
 - `data-plantuml-source-open="true"` on the `<figure>` while the panel is open, part of the

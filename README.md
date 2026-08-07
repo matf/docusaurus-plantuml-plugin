@@ -502,9 +502,9 @@ Setting `zoom: false` restores the previous markup exactly.
 
 ## Source view
 
-Every rendered diagram offers its own source. The `</>` control in the toolbar opens a panel
-below the diagram containing the source exactly as authored, with a button that copies it to
-the clipboard.
+Every rendered diagram offers its own source. The `</>` control in the toolbar **flips the
+frame**: the source takes the diagram's place, in the same box, with a button that copies it to
+the clipboard. Press it again to flip back.
 
 ````markdown
 ```plantuml title="Readers can copy this"
@@ -516,9 +516,18 @@ Alice -> Bob : Hello
 
 Details worth knowing:
 
-- **The panel is a sibling of the zoom stage, never a child.** Zooming, panning and maximizing
-  cannot move, scale or clip it, and it stays outside the `role="img"` subtree — which is opaque
-  to assistive technology, so a panel inside it would be unreachable.
+- **The source shares the diagram's frame.** It was previously rendered _below_ the diagram,
+  which had two failure modes: a diagram taller than the window pushed it off-screen, so the
+  control looked broken; and while maximized it was painted behind the full-screen overlay, so
+  it was invisible however far you scrolled. In the frame it appears exactly where the picture
+  was.
+- **The diagram is hidden, not unmounted.** The frame keeps its height, so nothing on the page
+  moves when you flip, and your zoom and pan survive the round trip.
+- **The zoom controls step aside while the source is shown** — they would act on a picture
+  nobody can see. Maximize stays, because it sizes the frame the source is read in, and taking
+  it away while maximized would leave Escape as the only way out.
+- The source stays outside the `role="img"` subtree, which is opaque to assistive technology —
+  content inside it would be unreachable for screen-reader users.
 - **The copy result is announced through a `role="status"` region**, not by renaming the button.
   A control whose accessible name changes is announced as a new control every time.
 - **A failed copy says so.** `navigator.clipboard` is undefined outside a secure context, which

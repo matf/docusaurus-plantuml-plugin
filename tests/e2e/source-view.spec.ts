@@ -100,24 +100,57 @@ test.describe('diagram source view', () => {
     await expect(optedIn.getByRole('button', {name: 'Show diagram source'})).toBeVisible();
   });
 
-  test('survives zooming, and is not clipped by the viewport', async ({page}) => {
+  test('replaces the diagram in its own frame rather than appearing below it', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 1);
+
+    const figure = page.locator(diagram).first();
+    const frame = figure.locator('[class*="stage"]').first();
+    await figure.getByRole('button', {name: 'Show diagram source'}).click();
+
+    // Genuinely on screen, not merely present: below the diagram, a tall one pushed it out of
+    // the viewport and the control looked broken.
+    await expect(figure.locator('pre')).toBeInViewport();
+    await expect(frame.locator('pre')).toHaveCount(1);
+    // The zoom controls step aside — they would act on a picture nobody can see.
+    await expect(figure.getByRole('button', {name: 'Zoom in'})).toHaveCount(0);
+  });
+
+  test('is readable while the diagram is maximized', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 1);
+
+    const figure = page.locator(diagram).first();
+    await figure.getByRole('button', {name: 'Maximize diagram'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-maximized', 'true');
+
+    await figure.getByRole('button', {name: 'Show diagram source'}).click();
+
+    const pre = figure.locator('pre');
+    await expect(pre).toBeVisible();
+    await expect(pre).toContainText('@startuml');
+
+    // The regression this pins: the panel used to render *behind* the opaque fixed overlay,
+    // so it was in the viewport yet nothing was painted where it sat.
+    const painted = await pre.evaluate((node) => {
+      const r = node.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return node.contains(hit) || node === hit;
+    });
+    expect(painted, 'the source must be what is painted, not the overlay above it').toBe(true);
+  });
+
+  test('brings the diagram back when flipped again', async ({page}) => {
     await page.goto('docs/zoom');
     await waitForDiagrams(page, 1);
 
     const figure = page.locator(diagram).first();
     await figure.getByRole('button', {name: 'Show diagram source'}).click();
-    const pre = figure.locator('pre');
-    await expect(pre).toBeVisible();
+    await figure.getByRole('button', {name: 'Hide diagram source'}).click();
 
-    await figure.getByRole('button', {name: 'Zoom in'}).click();
-    await expect(figure.locator('[data-plantuml-zoom]')).toHaveAttribute(
-      'data-plantuml-zoom',
-      '1.25',
-    );
-
-    // The panel is a sibling of the zoom stage, so scaling the diagram must not touch it.
-    await expect(pre).toBeVisible();
-    await expect(pre).toContainText('@startuml');
+    await expect(figure.locator('pre')).toHaveCount(0);
+    await expect(figure.locator('div[role="img"] > svg')).toBeVisible();
+    await expect(figure.getByRole('button', {name: 'Zoom in'})).toBeVisible();
   });
 
   test('keeps the source panel out of the role="img" subtree', async ({page}) => {

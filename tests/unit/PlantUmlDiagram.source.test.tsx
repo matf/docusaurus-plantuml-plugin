@@ -296,6 +296,103 @@ describe('without zoom', () => {
   });
 });
 
+describe('flipping the frame', () => {
+  it('puts the source where the diagram was, inside the same frame', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+    const stage = document.querySelector('[class*=stage]') as HTMLElement;
+
+    await user.click(toggle());
+
+    // Sharing the frame is the whole point: below it, a tall diagram pushed it off-screen and
+    // a maximized diagram painted over it.
+    expect(stage).toContainElement(panel());
+  });
+
+  it('keeps the diagram mounted so the frame does not resize', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+    const viewport = document.querySelector('[data-plantuml-zoom]');
+
+    await user.click(toggle());
+
+    // Hidden, not unmounted: it keeps contributing its height, and the zoom hook's layout
+    // measurements stay valid for the flip back.
+    expect(viewport).toBeInTheDocument();
+    expect(viewport).toHaveClass(/invisibleView/);
+  });
+
+  it('takes the invisible diagram out of the tab order', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+    expect(document.querySelector('[data-plantuml-zoom]')).toHaveAttribute('tabindex', '0');
+
+    await user.click(toggle());
+
+    expect(document.querySelector('[data-plantuml-zoom]')).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('hides the zoom controls, which would act on a picture nobody can see', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+    expect(screen.getByRole('button', {name: 'Zoom in'})).toBeInTheDocument();
+
+    await user.click(toggle());
+
+    expect(screen.queryByRole('button', {name: 'Zoom in'})).toBeNull();
+    expect(screen.queryByRole('button', {name: 'Zoom out'})).toBeNull();
+    expect(screen.queryByRole('button', {name: 'Reset zoom'})).toBeNull();
+  });
+
+  it('keeps maximize, so a maximized reader is never stranded', async () => {
+    // Removing it while maximized would leave Escape as the only way out.
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(toggle());
+
+    expect(screen.getByRole('button', {name: 'Maximize diagram'})).toBeInTheDocument();
+  });
+
+  it('works while the diagram is maximized', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(screen.getByRole('button', {name: 'Maximize diagram'}));
+    await user.click(toggle());
+
+    // The source view is inside the maximized stage, so it cannot be painted behind it.
+    const stage = document.querySelector('[class*=maximized]') as HTMLElement;
+    expect(stage).toContainElement(panel());
+    expect(panel()).toHaveTextContent('Alice -> Bob : Hello');
+  });
+
+  it('brings the diagram back when flipped again', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(toggle());
+    await user.click(toggle());
+
+    expect(panel()).toBeNull();
+    expect(document.querySelector('[data-plantuml-zoom]')).not.toHaveClass(/invisibleView/);
+    expect(screen.getByRole('button', {name: 'Zoom in'})).toBeInTheDocument();
+  });
+
+  it('collapses the canvas rather than unmounting it when there is no zoom frame', async () => {
+    setStubOptions({zoom: false});
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(toggle());
+
+    // Still the figure's first child, so the documented pre-zoom shape survives.
+    expect(figure().firstElementChild).toHaveAttribute('role', 'img');
+    expect(figure().firstElementChild).toHaveClass(/hiddenView/);
+    expect(panel()).toHaveTextContent('Alice -> Bob');
+  });
+});
+
 describe('other states', () => {
   it('offers no source panel before the diagram is ready', () => {
     render(<PlantUmlDiagram source={SOURCE} />);

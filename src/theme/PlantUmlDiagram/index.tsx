@@ -279,7 +279,9 @@ export default function PlantUmlDiagram({
   // stays a stable contract for tests and for author CSS.
   const canvas = state.svg !== null && (
     <div
-      className={styles.canvas}
+      className={
+        !interactive && sourceOpen ? `${styles.canvas} ${styles.hiddenView}` : styles.canvas
+      }
       role="img"
       aria-label={label}
       // Sanitized above unless `sanitizeSvg: false` was explicitly opted into.
@@ -301,13 +303,18 @@ export default function PlantUmlDiagram({
   );
 
   /**
-   * The source panel sits outside the zoom stage, so zooming and maximizing never move or clip
-   * it, and it reads in document order right after the picture it belongs to.
+   * The source *replaces the diagram in its own frame* rather than appearing beneath it.
+   *
+   * Below the diagram it had two failure modes that the frame removes by construction: a
+   * diagram taller than the window pushed the panel off-screen, so the control looked broken;
+   * and while maximized the panel was painted behind the `position: fixed` overlay, so it was
+   * invisible however far you scrolled. Living in the same box as the picture, it is visible
+   * exactly when and where the picture was.
    */
-  const sourcePanel = sourceAvailable && sourceOpen && state.status === 'ready' && (
-    <div className={styles.sourcePanel} id={sourcePanelId}>
-      <div className={styles.sourcePanelBar}>
-        <span className={styles.sourcePanelTitle}>{engineName} source</span>
+  const sourceView = sourceAvailable && sourceOpen && state.status === 'ready' && (
+    <div className={styles.sourceView} id={sourcePanelId}>
+      <div className={styles.sourceViewBar}>
+        <span className={styles.sourceViewTitle}>{engineName} source</span>
         {/*
          * `role="status"` rather than a changing button label: a reader using a screen reader
          * hears the outcome once, and the button keeps the same accessible name throughout.
@@ -345,7 +352,16 @@ export default function PlantUmlDiagram({
         ...(sourceOpen ? {[DATA_ATTR.sourceOpen]: 'true'} : {}),
       }}
     >
+      {/*
+       * The canvas collapses with `display: none` rather than being unmounted, so
+       * `figure > div[role="img"]` stays the figure's first child — the shape the pre-zoom
+       * markup has always had, which both suites pin. Collapsing rather than hiding is right
+       * here: with no zoom frame there is no box height to preserve, and the source should
+       * take the diagram's place rather than appear below it.
+       */}
       {state.status === 'ready' && state.svg !== null && !interactive && canvas}
+
+      {state.status === 'ready' && state.svg !== null && !interactive && sourceView}
 
       {/*
        * With zoom off there is no stage to hang controls on, so the source toggle gets its own
@@ -367,57 +383,80 @@ export default function PlantUmlDiagram({
           ref={zoom.stageRef}
           className={zoom.maximized ? `${styles.stage} ${styles.maximized}` : styles.stage}
         >
-          <div
-            ref={zoom.viewportRef}
-            className={styles.viewport}
-            tabIndex={0}
-            aria-describedby={hintId}
-            aria-keyshortcuts="Plus Minus 0 ArrowUp ArrowDown ArrowLeft ArrowRight"
-            onKeyDown={zoom.onKeyDown}
-            // React renders the initial value so the element is findable by this attribute from the
-            // first paint — it is the selector tests and author CSS use. The hook then owns the value.
-            // React never rewrites an unchanged attribute, so the two do not fight.
-            {...{[DATA_ATTR.zoom]: '1'}}
-          >
-            {/*
-             * The transform layer sits outside the `role="img"` element on purpose: that
-             * element uses `dangerouslySetInnerHTML`, so it cannot have React children, and
-             * `role="img"` makes its whole subtree opaque to assistive technology.
-             */}
-            <div ref={zoom.layerRef} className={styles.layer}>
-              {canvas}
+          {/*
+           * The viewport and the source view share one grid cell, so the source lands exactly
+           * where the picture was, at exactly its size. The viewport is hidden with
+           * `visibility`, not `display`, so it keeps contributing its height — the frame does
+           * not resize when you flip — and the zoom hook's `clientWidth`/`clientHeight`
+           * measurements stay valid for when you flip back.
+           */}
+          <div className={styles.stageBody}>
+            <div
+              ref={zoom.viewportRef}
+              className={
+                sourceOpen ? `${styles.viewport} ${styles.invisibleView}` : styles.viewport
+              }
+              tabIndex={sourceOpen ? -1 : 0}
+              aria-describedby={hintId}
+              aria-keyshortcuts="Plus Minus 0 ArrowUp ArrowDown ArrowLeft ArrowRight"
+              onKeyDown={zoom.onKeyDown}
+              // React renders the initial value so the element is findable by this attribute from the
+              // first paint — it is the selector tests and author CSS use. The hook then owns the value.
+              // React never rewrites an unchanged attribute, so the two do not fight.
+              {...{[DATA_ATTR.zoom]: '1'}}
+            >
+              {/*
+               * The transform layer sits outside the `role="img"` element on purpose: that
+               * element uses `dangerouslySetInnerHTML`, so it cannot have React children, and
+               * `role="img"` makes its whole subtree opaque to assistive technology.
+               */}
+              <div ref={zoom.layerRef} className={styles.layer}>
+                {canvas}
+              </div>
             </div>
+            {sourceView}
           </div>
 
           {/*
            * `role="group"`, not `role="toolbar"`: a toolbar owes readers arrow-key navigation
            * between its buttons, and the arrow keys already pan the diagram.
            */}
+          {/*
+           * The zoom controls are hidden while the source is shown: they would act on a picture
+           * nobody can see. Maximize stays — it is what sizes the frame the source is read in,
+           * and removing it while maximized would strand the reader with no way back but Escape.
+           */}
           <div className={styles.toolbar} role="group" aria-label={`${label} zoom controls`}>
-            <button
-              type="button"
-              className={styles.toolbarButton}
-              aria-label="Zoom out"
-              onClick={zoom.zoomOut}
-            >
-              <span aria-hidden="true">−</span>
-            </button>
-            <button
-              type="button"
-              className={styles.toolbarButton}
-              aria-label="Zoom in"
-              onClick={zoom.zoomIn}
-            >
-              <span aria-hidden="true">+</span>
-            </button>
-            <button
-              type="button"
-              className={styles.toolbarButton}
-              aria-label="Reset zoom"
-              onClick={zoom.reset}
-            >
-              <span aria-hidden="true">⟲</span>
-            </button>
+            {!sourceOpen && (
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label="Zoom out"
+                onClick={zoom.zoomOut}
+              >
+                <span aria-hidden="true">−</span>
+              </button>
+            )}
+            {!sourceOpen && (
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label="Zoom in"
+                onClick={zoom.zoomIn}
+              >
+                <span aria-hidden="true">+</span>
+              </button>
+            )}
+            {!sourceOpen && (
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label="Reset zoom"
+                onClick={zoom.reset}
+              >
+                <span aria-hidden="true">⟲</span>
+              </button>
+            )}
             <button
               type="button"
               className={styles.toolbarButton}
@@ -429,7 +468,11 @@ export default function PlantUmlDiagram({
             </button>
             {sourceToggle}
             {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
-            <span ref={zoom.readoutRef} className={styles.readout} aria-hidden="true">
+            <span
+              ref={zoom.readoutRef}
+              className={sourceOpen ? `${styles.readout} ${styles.hiddenView}` : styles.readout}
+              aria-hidden="true"
+            >
               100%
             </span>
           </div>
@@ -442,8 +485,6 @@ export default function PlantUmlDiagram({
           to pan, and zero to reset.
         </p>
       )}
-
-      {sourcePanel}
 
       {state.status !== 'ready' && state.status !== 'error' && (
         // `aria-busy` on the figure already conveys progress; announcing every phase change

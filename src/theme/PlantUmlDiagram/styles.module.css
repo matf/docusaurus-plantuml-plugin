@@ -295,40 +295,64 @@
 /*
  * Source view.
  *
- * The panel is a sibling of the zoom stage, never a child, so zooming, panning and maximizing
- * cannot move, scale or clip it. It is plain flow content: the reader can select the text with
- * the mouse even when the clipboard is unavailable.
+ * The source takes the diagram's place inside the same frame rather than appearing beneath it.
+ * Below the diagram it had two failure modes this removes by construction: a diagram taller
+ * than the window pushed it off-screen, and while maximized it was painted behind the
+ * `position: fixed` overlay. In the frame it is visible exactly where the picture was.
  */
-.plainToolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0.25rem;
+
+/* One grid cell shared by the viewport and the source view, so they occupy the same box. */
+.stageBody {
+  display: grid;
 }
 
-.sourcePanel {
-  margin-top: 0.5rem;
+.stageBody > * {
+  grid-area: 1 / 1;
+  /* Without this a wide <pre> would stretch the grid column instead of scrolling. */
+  min-width: 0;
+}
+
+/*
+ * `visibility`, not `display`: the hidden viewport keeps contributing its height, so the frame
+ * does not resize when flipping, and the zoom hook's layout measurements stay valid for the
+ * flip back. A `visibility: hidden` subtree is also not focusable and takes no pointer events,
+ * so the invisible diagram cannot be tabbed into or dragged.
+ */
+.invisibleView {
+  visibility: hidden;
+}
+
+/* Collapses entirely — used where there is no frame height worth preserving. */
+.hiddenView {
+  display: none;
+}
+
+.sourceView {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: var(--ifm-global-radius);
   background: var(--ifm-background-surface-color);
   overflow: hidden;
 }
 
-.sourcePanelBar {
+.sourceViewBar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.375rem 0.5rem 0.375rem 0.75rem;
+  /* Clears the toolbar, which floats over the top-right of the same frame. */
+  padding: 0.375rem 10.5rem 0.375rem 0.75rem;
   border-bottom: 1px solid var(--ifm-color-emphasis-200);
 }
 
-.sourcePanelTitle {
+.sourceViewTitle {
   color: var(--ifm-color-emphasis-700);
   font-size: 0.8125rem;
   font-weight: 600;
 }
 
-/* Pushes the copy control to the right and gives the status room without shifting it. */
 .copyStatus {
   flex: 1;
   color: var(--ifm-color-emphasis-700);
@@ -358,15 +382,30 @@
 }
 
 .sourceCode {
-  max-height: 20rem;
+  flex: 1;
+  min-height: 0;
   margin: 0;
   padding: 0.75rem;
   overflow: auto;
   background: transparent;
   font-size: 0.8125rem;
-  /* Wraps rather than scrolls horizontally: diagram source is read, not just copied. */
+  /* Wraps rather than scrolls sideways: diagram source is read, not just copied. */
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/*
+ * Without a zoom frame the source has no box to fill, so it needs a floor of its own — and a
+ * ceiling, so a long diagram cannot produce an endless wall of text.
+ */
+.figure:not([data-plantuml-interactive]) .sourceView {
+  max-height: 30rem;
+}
+
+.plainToolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
 }
 
 @media (forced-colors: active) {
