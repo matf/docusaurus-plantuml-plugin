@@ -14,6 +14,7 @@ Decisions large enough to deserve their own record live in `docs/adr/`:
 - [ADR 0002 — Use `renderToString`, not the DOM `render()` API](adr/0002-render-to-string.md)
 - [ADR 0003 — Zoom by transforming a wrapper, not the SVG](adr/0003-zoom-container-transform.md)
 - [ADR 0004 — Render DOT with the Graphviz already inside `@plantuml/core`](adr/0004-graphviz-engine-reuse.md)
+- [ADR 0005 — Serve the standard library as per-namespace bundles](adr/0005-stdlib-bundles.md)
 
 ## Overview
 
@@ -24,8 +25,9 @@ docusaurus.config.ts
   src/index.ts ─────────────── validateOptions()  ── src/options.ts
         │                       (build fails early on bad config)
         ├── getThemePath()   ── registers dist/theme as a plugin theme
-        ├── contentLoaded()  ── setGlobalData({options, assetsDir, coreVersion})
+        ├── contentLoaded()  ── setGlobalData({options, assetsDir, coreVersion, stdlib})
         └── configureWebpack ── copies viz-global.js + plantuml.js into the build
+                                plus one bundle per standard library namespace
                                                               ┃  Node / SSR boundary
 ──────────────────────────────────────────────────────────────╂──────────────────────────
                                                               ┃  Browser
@@ -124,6 +126,32 @@ than a cast to `any`. If Rspack is active but `CopyRspackPlugin` is missing, the
 with an actionable message rather than silently emitting nothing. The end-to-end suite
 exercises the webpack path.
 
+### The standard library
+
+`src/stdlib.ts` runs alongside `locatePlantUmlCore()` and decides which standard library
+namespaces this site emits: the vendored bundles in `assets/stdlib`, narrowed by
+`stdlib.namespaces` if set, plus anything `stdlib.include` names, generated on demand from a
+`plantuml-stdlib` checkout the site points at and cached under `.docusaurus`. They are emitted
+into
+
+```text
+<baseUrl>assets/plantuml-client-<coreVersion>/stdlib-<revision>/
+```
+
+The extra `stdlib-<revision>` segment exists because the standard library changes on its own
+schedule, independent of the engine version above it. The same revision is folded into the
+render cache key.
+
+A small index — namespace to its dependencies — is published through global data. It has to
+come from the build: `k8s/Common.puml` includes `<c4/…>`, which the engine would only discover
+mid-render, synchronously, far too late to fetch anything. Dependencies reachable only through
+a namespace's `_examples_/` files are recorded separately and loaded only when a diagram
+includes an example, so a C4 diagram does not drag in the 160 KB of `office` that C4's examples
+use.
+
+See [ADR 0005](adr/0005-stdlib-bundles.md) for why the bundles are shaped this way and why the
+vendored set is nine namespaces rather than all thirty-four.
+
 ### Loading (browser)
 
 `runtime/assetLoader.ts` holds **two independent singletons**, because the two engines have
@@ -156,6 +184,17 @@ very different sizes and a page that uses only one must not pay for the other:
 
 A DOT-only page therefore requests `viz-global.js` once and `plantuml.js` never, which the
 end-to-end suite asserts directly.
+
+`runtime/stdlibLoader.ts` is the third loader, and the odd one out. `@plantuml/core` resolves
+`!include <c4/…>` against `window.PLANTUML_STDLIB`, and when a namespace is missing it appends
+a `<script src="c4.min.js">` of its own — a **relative** URL, which on a docs site resolves to
+`/docs/architecture/c4.min.js` and 404s. Populating the global first does not prevent it: the
+engine checks its own `window.__pl_script_state` bookkeeping before it reads the global. So the
+loader scans the source for `<namespace/…>`, expands the closure from the manifest, loads each
+bundle from the assets directory where the URL is right, and then writes
+`window.__pl_script_state['c4.min.js'] = {state: 'loaded', ok: [], err: []}` so the engine finds
+the work already done. This runs concurrently with `loadPlantUmlRuntime()`, since both are
+shared, idempotent downloads. See [ADR 0005](adr/0005-stdlib-bundles.md).
 
 Concurrency and lifecycle:
 

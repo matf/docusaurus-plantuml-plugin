@@ -60,6 +60,52 @@ export type ResolvedGraphvizOptions = Required<Omit<GraphvizOptions, 'languages'
 };
 
 /**
+ * PlantUML standard library support: `!include <C4/C4_Container>` and friends.
+ *
+ * On by default and normally not worth configuring. The two lists exist for the namespaces
+ * this package does not vendor — the standard library is 265 MB in full, and several of its
+ * namespaces carry no upstream licence — which a site can still opt into from its own
+ * checkout. See `assets/stdlib/LICENSES.md` for what is vendored and under what terms.
+ */
+export interface StdlibOptions {
+  /**
+   * Resolve `!include <namespace/…>` at all. `false` (or `stdlib: false`) leaves such
+   * diagrams to fail in the engine, exactly as they did before this feature existed.
+   */
+  enabled?: boolean;
+  /**
+   * Extra namespaces to make available, beyond the vendored ones — `['aws', 'tupadr3']`.
+   * Each must be found in one of {@link StdlibOptions.source}, and the build fails naming
+   * the namespace if it is not.
+   */
+  include?: string[];
+  /**
+   * Directories to resolve {@link StdlibOptions.include} from: the `stdlib/` directory of a
+   * `plantuml-stdlib` checkout, relative to the site directory or absolute. Searched in
+   * order, before the vendored bundles, so a namespace can also be replaced with a newer one
+   * by naming it in `include`.
+   */
+  source?: string | string[];
+  /**
+   * Narrow the vendored namespaces emitted into the build, for sites that care more about
+   * build output size than about which diagrams keep working. Dependencies of the named
+   * namespaces are kept regardless. Defaults to all of them; a reader only downloads the
+   * ones a page uses either way.
+   */
+  namespaces?: string[];
+}
+
+/** Standard library options after validation, with every default applied. */
+export interface ResolvedStdlibOptions {
+  enabled: boolean;
+  /** Normalized to lower case. */
+  include: string[];
+  source: string[];
+  /** Normalized to lower case. `null` means "every vendored namespace". */
+  namespaces: string[] | null;
+}
+
+/**
  * Options accepted by the plugin in `docusaurus.config.*`.
  *
  * Every field is optional; see {@link DEFAULT_OPTIONS} for the defaults.
@@ -93,17 +139,23 @@ export interface PlantUmlPluginOptions {
   showSource?: boolean;
   /** Graphviz/DOT diagram support. See {@link GraphvizOptions}. */
   graphviz?: GraphvizOptions;
+  /**
+   * PlantUML standard library support. See {@link StdlibOptions}. `false` is shorthand for
+   * `{enabled: false}`.
+   */
+  stdlib?: StdlibOptions | false;
   /** Docusaurus plugin instance id, used when the plugin is registered more than once. */
   id?: string;
 }
 
 /** Plugin options after validation, with every default applied. */
 export type ResolvedPlantUmlOptions = Required<
-  Omit<PlantUmlPluginOptions, 'id' | 'languages' | 'graphviz'>
+  Omit<PlantUmlPluginOptions, 'id' | 'languages' | 'graphviz' | 'stdlib'>
 > & {
   /** Normalized to lower case; matching is case-insensitive. */
   languages: string[];
   graphviz: ResolvedGraphvizOptions;
+  stdlib: ResolvedStdlibOptions;
 };
 
 export const DEFAULT_GRAPHVIZ_OPTIONS: ResolvedGraphvizOptions = {
@@ -113,6 +165,13 @@ export const DEFAULT_GRAPHVIZ_OPTIONS: ResolvedGraphvizOptions = {
   allowEngineOverride: true,
   maxSourceBytes: 100_000,
   transparentBackground: true,
+};
+
+export const DEFAULT_STDLIB_OPTIONS: ResolvedStdlibOptions = {
+  enabled: true,
+  include: [],
+  source: [],
+  namespaces: null,
 };
 
 export const DEFAULT_OPTIONS: ResolvedPlantUmlOptions = {
@@ -127,6 +186,7 @@ export const DEFAULT_OPTIONS: ResolvedPlantUmlOptions = {
   zoom: true,
   showSource: true,
   graphviz: DEFAULT_GRAPHVIZ_OPTIONS,
+  stdlib: DEFAULT_STDLIB_OPTIONS,
 };
 
 const CACHE_MODES: readonly CacheMode[] = ['none', 'memory', 'session'];
@@ -259,6 +319,90 @@ function validateGraphviz(value: unknown): ResolvedGraphvizOptions {
   };
 }
 
+/** Shared by `stdlib.include` and `stdlib.namespaces`, which are both lists of namespaces. */
+function validateNamespaceList(value: unknown, key: string): string[] {
+  if (!Array.isArray(value)) {
+    fail(`options.${key} must be an array of strings, received ${JSON.stringify(value)}.`);
+  }
+  const normalized = value.map((entry, index) => {
+    if (typeof entry !== 'string' || entry.trim() === '') {
+      fail(
+        `options.${key}[${index}] must be a non-empty string, received ${JSON.stringify(entry)}.`,
+      );
+    }
+    // Namespaces are matched case-insensitively: the engine lower-cases `<C4/…>` before
+    // looking it up, so `'C4'` and `'c4'` have to mean the same thing here too.
+    return entry.trim().toLowerCase();
+  });
+  const duplicates = normalized.filter((entry, index) => normalized.indexOf(entry) !== index);
+  if (duplicates.length > 0) {
+    fail(`options.${key} contains duplicate entries: ${quoteList([...new Set(duplicates)])}.`);
+  }
+  return normalized;
+}
+
+function validateStdlibSource(value: unknown): string[] {
+  if (value === undefined) return [];
+  const entries = Array.isArray(value) ? value : [value];
+  return entries.map((entry, index) => {
+    if (typeof entry !== 'string' || entry.trim() === '') {
+      const where = Array.isArray(value) ? `stdlib.source[${index}]` : 'stdlib.source';
+      fail(`options.${where} must be a non-empty string, received ${JSON.stringify(entry)}.`);
+    }
+    return entry.trim();
+  });
+}
+
+/**
+ * Validates the nested `stdlib` group, accepting `false` as shorthand for `{enabled: false}`.
+ */
+function validateStdlib(value: unknown): ResolvedStdlibOptions {
+  if (value === undefined) return {...DEFAULT_STDLIB_OPTIONS, include: [], source: []};
+  if (value === false) return {...DEFAULT_STDLIB_OPTIONS, enabled: false, include: [], source: []};
+  if (!isPlainObject(value)) {
+    fail(`options.stdlib must be an object or false, received ${JSON.stringify(value)}.`);
+  }
+
+  const allowedKeys = ['enabled', 'include', 'source', 'namespaces'];
+  const unknownKeys = Object.keys(value).filter((key) => !allowedKeys.includes(key));
+  if (unknownKeys.length > 0) {
+    fail(
+      `Unknown option${unknownKeys.length > 1 ? 's' : ''} ` +
+        `${quoteList(unknownKeys.map((key) => `stdlib.${key}`))}. ` +
+        `Supported options: ${quoteList(allowedKeys.map((key) => `stdlib.${key}`))}.`,
+    );
+  }
+
+  const include =
+    value.include === undefined ? [] : validateNamespaceList(value.include, 'stdlib.include');
+  const source = validateStdlibSource(value.source);
+  const namespaces =
+    value.namespaces === undefined
+      ? null
+      : validateNamespaceList(value.namespaces, 'stdlib.namespaces');
+
+  if (namespaces !== null && namespaces.length === 0) {
+    fail(
+      'options.stdlib.namespaces must name at least one namespace. To turn the standard ' +
+        'library off entirely, use `stdlib: false`.',
+    );
+  }
+  if (include.length > 0 && source.length === 0) {
+    fail(
+      `options.stdlib.include names ${quoteList(include)}, but options.stdlib.source is not ` +
+        'set, so there is nowhere to read them from. Point it at the `stdlib` directory of a ' +
+        'plantuml-stdlib checkout.',
+    );
+  }
+
+  return {
+    enabled: validateBoolean(value.enabled, 'stdlib.enabled', DEFAULT_STDLIB_OPTIONS.enabled),
+    include,
+    source,
+    namespaces,
+  };
+}
+
 function validateRenderTimeout(value: unknown): number {
   if (value === undefined) return DEFAULT_OPTIONS.renderTimeoutMs;
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -296,6 +440,7 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
       ...DEFAULT_OPTIONS,
       languages: [...DEFAULT_OPTIONS.languages],
       graphviz: {...DEFAULT_GRAPHVIZ_OPTIONS, languages: [...DEFAULT_GRAPHVIZ_OPTIONS.languages]},
+      stdlib: {...DEFAULT_STDLIB_OPTIONS, include: [], source: []},
     };
   }
   if (!isPlainObject(rawOptions)) {
@@ -314,6 +459,7 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
     'zoom',
     'showSource',
     'graphviz',
+    'stdlib',
     // Docusaurus injects `id` for multi-instance plugins.
     'id',
   ]);
@@ -337,6 +483,7 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
 
   const languages = validateLanguages(rawOptions.languages, 'languages', DEFAULT_OPTIONS.languages);
   const graphviz = validateGraphviz(rawOptions.graphviz);
+  const stdlib = validateStdlib(rawOptions.stdlib);
 
   // A fence has exactly one language, so a language claimed by both engines would make the
   // rendered output depend on the order the wrapper happens to check them in. Reject it.
@@ -353,6 +500,7 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
   return {
     languages,
     graphviz,
+    stdlib,
     theme: (theme as DiagramTheme | undefined) ?? DEFAULT_OPTIONS.theme,
     lazy: validateBoolean(rawOptions.lazy, 'lazy', DEFAULT_OPTIONS.lazy),
     cache: (cache as CacheMode | undefined) ?? DEFAULT_OPTIONS.cache,

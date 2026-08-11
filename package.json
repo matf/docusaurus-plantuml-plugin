@@ -1,6 +1,6 @@
 {
   "name": "@matfsw/docusaurus-plantuml-plugin",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Render PlantUML diagrams in Docusaurus 3 entirely in the browser - no Java, no PlantUML server, no CDN.",
   "keywords": [
     "docusaurus",
@@ -35,6 +35,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "assets",
     "dist",
     "README.md",
     "LICENSE",
@@ -62,6 +63,7 @@
     "verify:tag": "node scripts/verify-tag-version.mjs",
     "sync:meta": "node scripts/sync-project-metadata.mjs",
     "sync:check": "node scripts/sync-project-metadata.mjs --check",
+    "stdlib:update": "node scripts/update-stdlib.mjs",
     "example:install": "npm --prefix examples/docusaurus install",
     "example:build": "npm --prefix examples/docusaurus run build",
     "example:serve": "npm --prefix examples/docusaurus run serve",

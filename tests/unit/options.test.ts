@@ -29,6 +29,12 @@ describe('plugin option defaults', () => {
         maxSourceBytes: 100_000,
         transparentBackground: true,
       },
+      stdlib: {
+        enabled: true,
+        include: [],
+        source: [],
+        namespaces: null,
+      },
     });
   });
 
@@ -251,5 +257,88 @@ describe('graphviz options', () => {
     } as never);
 
     expect(published?.options?.graphviz).toMatchObject({engine: 'twopi', enabled: true});
+  });
+});
+
+describe('standard library options', () => {
+  it('is on by default, with nothing to configure', () => {
+    expect(resolveOptions({}).stdlib).toEqual({
+      enabled: true,
+      include: [],
+      source: [],
+      namespaces: null,
+    });
+  });
+
+  it('accepts `stdlib: false` as shorthand for switching it off', () => {
+    expect(resolveOptions({stdlib: false}).stdlib.enabled).toBe(false);
+    expect(resolveOptions({stdlib: {enabled: false}}).stdlib.enabled).toBe(false);
+  });
+
+  it('lower-cases namespaces, because the engine looks them up that way', () => {
+    const resolved = resolveOptions({
+      stdlib: {include: ['AWS', ' tupadr3 '], source: 'vendor/stdlib'},
+    });
+    expect(resolved.stdlib.include).toEqual(['aws', 'tupadr3']);
+    expect(resolved.stdlib.source).toEqual(['vendor/stdlib']);
+  });
+
+  it('accepts several source directories', () => {
+    const resolved = resolveOptions({stdlib: {include: ['aws'], source: ['a', 'b']}});
+    expect(resolved.stdlib.source).toEqual(['a', 'b']);
+  });
+
+  it('refuses an include with nowhere to read it from', () => {
+    expect(() => resolveOptions({stdlib: {include: ['aws']}})).toThrow(/stdlib\.source is not set/);
+  });
+
+  it('rejects duplicate and empty namespace entries', () => {
+    expect(() => resolveOptions({stdlib: {include: ['aws', 'AWS'], source: 'x'}})).toThrow(
+      /duplicate entries: 'aws'/,
+    );
+    expect(() => resolveOptions({stdlib: {include: [''], source: 'x'}})).toThrow(
+      /stdlib\.include\[0\] must be a non-empty string/,
+    );
+  });
+
+  it('points at `stdlib: false` rather than an empty namespace list', () => {
+    expect(() => resolveOptions({stdlib: {namespaces: []}})).toThrow(/use `stdlib: false`/);
+  });
+
+  it('rejects an unknown nested key', () => {
+    expect(() => resolveOptions({stdlib: {namespace: ['c4']} as never})).toThrow(
+      /Unknown option 'stdlib\.namespace'/,
+    );
+  });
+
+  it('rejects a value that is neither an object nor false', () => {
+    expect(() => resolveOptions({stdlib: true as never})).toThrow(
+      /options\.stdlib must be an object or false/,
+    );
+  });
+
+  it('publishes the standard library location and index to the browser', () => {
+    const plugin = plantumlPlugin({siteDir: '/tmp'} as never, {});
+    let published: {stdlib?: {dir?: string; manifest?: {namespaces?: object}}} | undefined;
+    void plugin.contentLoaded?.({
+      content: undefined,
+      actions: {setGlobalData: (data: never) => (published = data)},
+      allContent: {},
+    } as never);
+
+    expect(published?.stdlib?.dir).toMatch(/\/stdlib-[0-9a-f]{12}$/);
+    expect(Object.keys(published?.stdlib?.manifest?.namespaces ?? {})).toContain('c4');
+  });
+
+  it('publishes nothing when the standard library is switched off', () => {
+    const plugin = plantumlPlugin({siteDir: '/tmp'} as never, {stdlib: false});
+    let published: {stdlib?: unknown} | undefined;
+    void plugin.contentLoaded?.({
+      content: undefined,
+      actions: {setGlobalData: (data: never) => (published = data)},
+      allContent: {},
+    } as never);
+
+    expect(published?.stdlib).toBeNull();
   });
 });

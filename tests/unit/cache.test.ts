@@ -9,7 +9,13 @@ import {
 } from '../../src/runtime/cache.js';
 
 const SOURCE = '@startuml\nAlice -> Bob\n@enduml';
-const BASE = {source: SOURCE, dark: false, sanitized: true, coreVersion: '1.2026.6'};
+const BASE = {
+  source: SOURCE,
+  dark: false,
+  sanitized: true,
+  coreVersion: '1.2026.6',
+  stdlibRevision: 'abc123' as string | null,
+};
 
 describe('cache keys', () => {
   it('is deterministic for identical input', () => {
@@ -36,8 +42,16 @@ describe('cache keys', () => {
     );
   });
 
+  it('changes when the standard library changes', () => {
+    expect(computeCacheKey({...BASE, stdlibRevision: 'def456'})).not.toBe(computeCacheKey(BASE));
+  });
+
+  it('separates renders made with and without the standard library', () => {
+    expect(computeCacheKey({...BASE, stdlibRevision: null})).not.toBe(computeCacheKey(BASE));
+  });
+
   it('encodes the colour mode and engine version legibly', () => {
-    expect(computeCacheKey({...BASE, dark: true})).toMatch(/^1\.2026\.6\|dark\|san\|/);
+    expect(computeCacheKey({...BASE, dark: true})).toMatch(/^1\.2026\.6\|abc123\|dark\|san\|/);
   });
 });
 
@@ -245,6 +259,7 @@ describe('graphviz cache keys', () => {
       dark: false,
       sanitized: true,
       coreVersion: base.coreVersion,
+      stdlibRevision: null,
     });
     expect(computeGraphvizCacheKey(base)).not.toBe(plantuml);
     expect(computeGraphvizCacheKey(base).startsWith('graphviz|')).toBe(true);

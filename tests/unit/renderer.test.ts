@@ -52,6 +52,7 @@ function request(overrides: Partial<Parameters<typeof renderDiagram>[0]> = {}) {
     timeoutMs: 5_000,
     assetsBaseUrl: ASSETS,
     coreVersion: '1.2026.6',
+    stdlib: null,
     cache: createDiagramCache('memory', 50),
     ...overrides,
   };

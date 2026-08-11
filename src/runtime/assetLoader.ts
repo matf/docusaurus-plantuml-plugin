@@ -48,34 +48,48 @@ function defaultImportModule(url: string): Promise<unknown> {
 }
 
 /**
- * Injects `viz-global.js` as a classic script, reusing an existing tag.
+ * Injects a classic script once, reusing an existing tag for the same URL.
  *
  * Client-side navigation re-mounts diagram components but does not reload the document, so
- * the marker attribute is what keeps a second `<script>` from ever being appended.
+ * the marker attribute is what keeps a second `<script>` from ever being appended. The URL is
+ * the marker's value, because the standard library loader adds a tag per namespace and a
+ * bare marker could not tell them apart.
+ *
+ * @param label how the asset is named in an error message, e.g. `Graphviz runtime`
  */
-function loadVizGlobal(url: string, timeoutMs: number): Promise<void> {
-  const existing = document.querySelector<HTMLScriptElement>(`script[${SCRIPT_MARKER}]`);
+export function loadClassicScript(url: string, timeoutMs: number, label: string): Promise<void> {
+  const existing = document.querySelector<HTMLScriptElement>(
+    `script[${SCRIPT_MARKER}=${JSON.stringify(url)}]`,
+  );
   if (existing) {
     if (existing.dataset.plantumlRuntimeState === 'loaded') return Promise.resolve();
-    if (existing.dataset.plantumlRuntimeState === 'error') {
-      return Promise.reject(
-        new PlantUmlError('load', `Failed to load the Graphviz runtime from ${url}.`),
-      );
-    }
-    return waitForScript(existing, url, timeoutMs);
+    // A failed tag is discarded rather than reused. The caller that reaches this point has
+    // already dropped its cached promise in order to retry, and reusing the dead tag would
+    // make that retry impossible — a single flaky response would poison the page.
+    if (existing.dataset.plantumlRuntimeState === 'error') existing.remove();
+    else return waitForScript(existing, url, timeoutMs, label);
   }
 
   const script = document.createElement('script');
-  script.setAttribute(SCRIPT_MARKER, '');
+  script.setAttribute(SCRIPT_MARKER, url);
   script.dataset.plantumlRuntimeState = 'loading';
   script.async = false;
   script.src = url;
-  const promise = waitForScript(script, url, timeoutMs);
+  const promise = waitForScript(script, url, timeoutMs, label);
   document.head.appendChild(script);
   return promise;
 }
 
-function waitForScript(script: HTMLScriptElement, url: string, timeoutMs: number): Promise<void> {
+function loadVizGlobal(url: string, timeoutMs: number): Promise<void> {
+  return loadClassicScript(url, timeoutMs, 'Graphviz runtime');
+}
+
+function waitForScript(
+  script: HTMLScriptElement,
+  url: string,
+  timeoutMs: number,
+  label: string,
+): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     let done = false;
     const finish = (fn: () => void) => {
@@ -96,7 +110,7 @@ function waitForScript(script: HTMLScriptElement, url: string, timeoutMs: number
         reject(
           new PlantUmlError(
             'load',
-            `Failed to load the Graphviz runtime from ${url}. ` +
+            `Failed to load the ${label} from ${url}. ` +
               'Check that the asset is served under your Docusaurus baseUrl with a JavaScript MIME type.',
           ),
         ),
@@ -237,10 +251,25 @@ export function isVizRuntimeRequested(): boolean {
   return cachedViz !== null;
 }
 
-/** Test-only: forgets both cached runtimes and removes the injected script tag. */
+/**
+ * Registers a callback for {@link resetRuntimeLoader}.
+ *
+ * The standard library loader keeps its own per-namespace cache but shares the script tags
+ * this module injects, so a reset that removed the tags without clearing that cache would
+ * leave it claiming namespaces are loaded when their globals are gone. The dependency points
+ * this way — loader to registry — so that `assetLoader` needs no import of its callers.
+ */
+const resetHooks: (() => void)[] = [];
+
+export function onRuntimeReset(hook: () => void): void {
+  resetHooks.push(hook);
+}
+
+/** Test-only: forgets every cached runtime and removes the injected script tags. */
 export function resetRuntimeLoader(): void {
   cachedRuntime = null;
   cachedViz = null;
+  resetHooks.forEach((hook) => hook());
   if (typeof document !== 'undefined') {
     document.querySelectorAll(`script[${SCRIPT_MARKER}]`).forEach((node) => node.remove());
   }

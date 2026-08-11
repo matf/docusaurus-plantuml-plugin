@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import {describe, expect, it, vi} from 'vitest';
 
 import type {ConfigureWebpackUtils} from '@docusaurus/types';
@@ -32,7 +34,7 @@ describe('runtime asset emission', () => {
   });
 
   it('copies both runtime files into a version-namespaced directory for the client', () => {
-    const plugin = plantumlPlugin(context, {});
+    const plugin = plantumlPlugin(context, {stdlib: false});
     const result = plugin.configureWebpack?.({}, false, utils, undefined) as {
       plugins: Array<{patterns?: unknown}>;
     };
@@ -47,6 +49,27 @@ describe('runtime asset emission', () => {
       'viz-global.js',
       'plantuml.js',
     ]);
+  });
+
+  it('emits every vendored standard library bundle beside the runtime', () => {
+    const plugin = plantumlPlugin(context, {});
+    const result = plugin.configureWebpack?.({}, false, utils, undefined) as {
+      plugins: Array<{patterns?: unknown}>;
+    };
+    const copyPlugin = result.plugins[0] as {patterns: Array<{from: string; to: string}>};
+    const stdlibPatterns = copyPlugin.patterns.filter((pattern) =>
+      pattern.from.includes(`${path.sep}assets${path.sep}stdlib${path.sep}`),
+    );
+
+    expect(stdlibPatterns.length).toBeGreaterThan(0);
+    expect(stdlibPatterns.map((pattern) => path.basename(pattern.from))).toContain('c4.min.js');
+    // The directory carries the standard library revision so a refresh cannot be served
+    // from a cache populated before it.
+    for (const pattern of stdlibPatterns) {
+      expect(pattern.to).toMatch(
+        /^assets\/plantuml-client-\d+\.\d+\.\d+\/stdlib-[0-9a-f]{12}\/\[name]\[ext]$/,
+      );
+    }
   });
 });
 

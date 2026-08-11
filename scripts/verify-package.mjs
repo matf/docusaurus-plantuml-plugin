@@ -15,9 +15,21 @@ import {parsePackResult} from './lib/pack-output.mjs';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
-/** Generous enough for the compiled plugin, but far below the ~8 MB PlantUML runtime. */
-const MAX_UNPACKED_BYTES = 400 * 1024;
-const MAX_PACKED_BYTES = 120 * 1024;
+/**
+ * Generous enough for the compiled plugin, but far below the ~8 MB PlantUML runtime, which
+ * stays in `@plantuml/core` where it belongs.
+ *
+ * The bulk of the allowance is the vendored standard library in `assets/stdlib`: ~3 MiB of
+ * generated bundles, ~0.7 MiB packed. A reader downloads only the namespaces a page uses, so
+ * this is install weight rather than page weight. Raising it further means either vendoring
+ * a namespace with no upstream licence or one of the icon libraries that run to tens of
+ * megabytes — see scripts/update-stdlib.mjs before you do.
+ */
+const MAX_UNPACKED_BYTES = 4 * 1024 * 1024;
+const MAX_PACKED_BYTES = 1024 * 1024;
+
+/** The compiled plugin on its own, with the vendored standard library set aside. */
+const MAX_CODE_UNPACKED_BYTES = 400 * 1024;
 
 const REQUIRED_FILES = [
   'dist/index.js',
@@ -36,9 +48,19 @@ const REQUIRED_FILES = [
   'dist/theme/PlantUmlDiagram/useZoomPan.js',
   'dist/theme/PlantUmlDiagram/zoomMath.js',
   'dist/theme/PlantUmlDiagram/styles.module.css',
+  'dist/stdlib.js',
+  'dist/stdlibBundle.js',
+  'dist/stdlibShared.js',
+  'dist/runtime/stdlibLoader.js',
+  'assets/stdlib/manifest.json',
+  'assets/stdlib/LICENSES.md',
+  'assets/stdlib/c4.min.js',
   'README.md',
   'LICENSE',
 ];
+
+/** Vendored standard library bundles, which the size budgets account for separately. */
+const STDLIB_ASSET_PATTERN = /^assets\/stdlib\//;
 
 const FORBIDDEN_PATTERNS = [
   {pattern: /\.map$/, reason: 'source maps are not published'},
@@ -115,6 +137,36 @@ if (result.size > MAX_PACKED_BYTES) {
   problems.push(
     `packed size ${formatBytes(result.size)} exceeds the ${formatBytes(MAX_PACKED_BYTES)} budget.`,
   );
+}
+
+// Budgeted apart from the standard library, so that vendoring more of it can never quietly
+// pay for the plugin's own code growing.
+const codeBytes = files
+  .filter((file) => !STDLIB_ASSET_PATTERN.test(file.path))
+  .reduce((total, file) => total + file.size, 0);
+if (codeBytes > MAX_CODE_UNPACKED_BYTES) {
+  problems.push(
+    `the compiled plugin is ${formatBytes(codeBytes)}, over the ` +
+      `${formatBytes(MAX_CODE_UNPACKED_BYTES)} budget for everything outside assets/stdlib.`,
+  );
+}
+
+// Every bundle the manifest promises has to be in the tarball; a half-published standard
+// library would fail in a reader's browser rather than here.
+const manifest = JSON.parse(
+  fs.readFileSync(path.join(root, 'assets', 'stdlib', 'manifest.json'), 'utf8'),
+);
+for (const [namespace, entry] of Object.entries(manifest.namespaces ?? {})) {
+  if (!packedPaths.has(`assets/stdlib/${entry.file}`)) {
+    problems.push(`the standard library manifest lists '${namespace}' but its bundle is missing`);
+  }
+}
+const packedBundles = [...packedPaths].filter((file) => /^assets\/stdlib\/.+\.min\.js$/.test(file));
+const promised = new Set(
+  Object.values(manifest.namespaces ?? {}).map((entry) => `assets/stdlib/${entry.file}`),
+);
+for (const file of packedBundles) {
+  if (!promised.has(file)) problems.push(`${file} is packed but the manifest does not list it`);
 }
 
 /** Every path an `exports` entry can resolve to must actually be in the tarball. */

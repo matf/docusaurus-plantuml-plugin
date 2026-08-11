@@ -17,15 +17,19 @@ import {
   type PlantUmlPluginOptions,
   type ResolvedPlantUmlOptions,
 } from './options.js';
+import {resolveStdlibAssets, type StdlibRuntimeManifest} from './stdlib.js';
 
 export type {
   CacheMode,
   DiagramTheme,
   PlantUmlPluginOptions,
   ResolvedPlantUmlOptions,
+  StdlibOptions,
+  ResolvedStdlibOptions,
 } from './options.js';
 export {DEFAULT_OPTIONS, PlantUmlOptionsError, resolveOptions} from './options.js';
 export {PLUGIN_ID, PLUGIN_NAME} from './constants.js';
+export type {StdlibRuntimeManifest} from './stdlib.js';
 
 /** Shape of the data this plugin publishes to the browser through Docusaurus global data. */
 export interface PlantUmlGlobalData {
@@ -34,6 +38,11 @@ export interface PlantUmlGlobalData {
   assetsDir: string;
   /** Installed `@plantuml/core` version; part of the cache key. */
   coreVersion: string;
+  /**
+   * `baseUrl`-relative directory holding the standard library bundles, and what is in it.
+   * `null` when the standard library is switched off.
+   */
+  stdlib: {dir: string; manifest: StdlibRuntimeManifest} | null;
 }
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -79,7 +88,7 @@ export function createCopyPlugin(
 }
 
 export default function plantumlPlugin(
-  _context: LoadContext,
+  context: LoadContext,
   options: PlantUmlPluginOptions = {},
 ): Plugin<void> {
   // Docusaurus already ran `validateOptions`, but the plugin function is also callable
@@ -87,6 +96,17 @@ export default function plantumlPlugin(
   const resolved = resolveOptions(options);
   const core = locatePlantUmlCore();
   const assetsDir = assetsDirForVersion(core.version);
+
+  const stdlib = resolveStdlibAssets({
+    options: resolved.stdlib,
+    currentDir,
+    siteDir: context.siteDir,
+    cacheDir: context.generatedFilesDir,
+  });
+  // The revision is part of the directory name, not just of the cache key: refreshing the
+  // standard library without moving the URL would leave readers on a cached bundle from
+  // before the refresh, and the mismatch would surface as an unresolved include.
+  const stdlibDir = stdlib ? `${assetsDir}/stdlib-${stdlib.manifest.revision}` : null;
 
   return {
     name: PLUGIN_NAME,
@@ -100,6 +120,7 @@ export default function plantumlPlugin(
         options: resolved,
         assetsDir,
         coreVersion: core.version,
+        stdlib: stdlib && stdlibDir ? {dir: stdlibDir, manifest: stdlib.manifest} : null,
       };
       actions.setGlobalData(globalData);
     },
@@ -116,6 +137,15 @@ export default function plantumlPlugin(
         // These files are already minified upstream; re-processing 8 MB is wasted work.
         info: {minimized: true},
       }));
+      if (stdlib && stdlibDir) {
+        patterns.push(
+          ...stdlib.files.map((absolutePath) => ({
+            from: absolutePath,
+            to: `${stdlibDir}/[name][ext]`,
+            info: {minimized: true} as const,
+          })),
+        );
+      }
       // Optional chaining, not laziness: `currentBundler` is absent on Docusaurus 3.5.x.
       return {plugins: [createCopyPlugin(utils?.currentBundler, patterns)]};
     },

@@ -15,6 +15,11 @@ export interface CacheKeyInput {
   dark: boolean;
   sanitized: boolean;
   coreVersion: string;
+  /**
+   * Identifies the standard library the diagram was rendered against, so refreshing it
+   * invalidates the entries whose pictures it shaped. `null` when it is switched off.
+   */
+  stdlibRevision: string | null;
 }
 
 export interface DiagramCache {
@@ -41,12 +46,18 @@ function hash(input: string): string {
   return value.toString(36).padStart(7, '0');
 }
 
-export function computeCacheKey({source, dark, sanitized, coreVersion}: CacheKeyInput): string {
+export function computeCacheKey({
+  source,
+  dark,
+  sanitized,
+  coreVersion,
+  stdlibRevision,
+}: CacheKeyInput): string {
   const mode = dark ? 'dark' : 'light';
   const clean = sanitized ? 'san' : 'raw';
   // The length guards against the (astronomically unlikely) 32-bit hash collision between
   // two different sources that happen to share every other key component.
-  return `${coreVersion}|${mode}|${clean}|${source.length}|${hash(source)}`;
+  return `${coreVersion}|${stdlibRevision ?? 'nostd'}|${mode}|${clean}|${source.length}|${hash(source)}`;
 }
 
 export interface GraphvizCacheKeyInput {
