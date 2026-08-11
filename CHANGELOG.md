@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1]
+
+### Fixed
+
+- **The toolbar's controls are drawn rather than typed** ([#21]). `⛶` U+26F6 SQUARE FOUR
+  CORNERS, the maximize icon, has no glyph in any font that ships with a stock Linux desktop,
+  so that control rendered as an empty box for an entire platform's readers — on the demo site
+  included. The other four only worked because DejaVu Sans happens to be installed, which a
+  minimal container image or a locked-down desktop does not promise, so all of them are now
+  inline SVG and the plugin depends on no font at all.
+
+  The source toggle's `</>` went the same way. It is ASCII and never had the glyph problem, but
+  left as text it would have been the one control still drawn in the page font, at a different
+  weight and optical size from its neighbours.
+
+  Nothing about the accessible surface changes: every button keeps its `aria-label`,
+  `aria-pressed`, `aria-expanded` and `aria-controls`, and the icons are `aria-hidden`. The
+  icons inherit `currentColor` and `1em`, so both colour modes and reader font scaling behave
+  exactly as before, with no CSS change. The `Copy` text button and the `⚠` error glyph are
+  unchanged.
+
+  If you worked around this with a `font-family` override on `[class*='toolbarButton']`, it is
+  now a harmless no-op and can be removed.
+
+### Changed
+
+- The example site records why its `onBrokenMarkdownLinks` stays at the top level rather than
+  moving to `markdown.hooks`, where Docusaurus 3.9 put it: 3.5's `markdown` schema rejects the
+  key outright, and CI builds that fixture against 3.5.2 — the oldest release this plugin's
+  peer range claims.
+
+[#21]: https://github.com/matf/docusaurus-plantuml-plugin/issues/21
+
 ## [1.3.0]
 
 ### Added
@@ -347,7 +380,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.1...v1.1.2

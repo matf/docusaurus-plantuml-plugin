@@ -898,6 +898,12 @@ The runtime requires:
 - `ResizeObserver` — optional; without it zoom still works, but the view is not re-clamped when
   the column is resized
 
+It requires **no particular fonts**. The toolbar's controls are inline SVG rather than symbol
+characters, which they were until 1.3.1: `⛶` U+26F6 (maximize) has no glyph in any font a stock
+Linux desktop ships, so it rendered as an empty box for those readers, and the rest only worked
+where DejaVu Sans happened to be installed. The icons inherit `currentColor` and `1em`, so they
+follow the colour mode and the reader's font size the way the characters did.
+
 That is modern evergreen Chrome, Edge, Firefox and Safari. Internet Explorer is not
 supported and will not be.
 

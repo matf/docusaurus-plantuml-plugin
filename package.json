@@ -1,6 +1,6 @@
 {
   "name": "@matfsw/docusaurus-plantuml-plugin",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Render PlantUML diagrams in Docusaurus 3 entirely in the browser - no Java, no PlantUML server, no CDN.",
   "keywords": [
     "docusaurus",

@@ -28,6 +28,12 @@ async function rectOf(locator: Locator) {
   });
 }
 
+/**
+ * The rendered diagram, as the README documents it. Scoped rather than a bare `svg` because
+ * the toolbar's control icons are SVG too — a loose selector would match those as well.
+ */
+const DIAGRAM_SVG = 'div[role="img"] > svg';
+
 test.describe('zoom and pan', () => {
   test('gives zoomable diagrams a labelled control group and leaves opted-out ones alone', async ({
     page,
@@ -48,6 +54,17 @@ test.describe('zoom and pan', () => {
     await expect(group.getByRole('button')).toHaveCount(5);
     await expect(group.getByRole('button', {name: 'Maximize diagram'})).toBeVisible();
     await expect(group.getByRole('button', {name: 'Show diagram source'})).toBeVisible();
+
+    // Every control is drawn, not typed. `⛶` U+26F6 had no glyph on a stock Linux desktop,
+    // so the maximize button used to render as a tofu box for a whole platform's readers.
+    // See issue #21. Asserted against the real build because this is a rendering bug.
+    await expect(group.locator('button > svg')).toHaveCount(5);
+    for (const name of ['Zoom out', 'Zoom in', 'Reset zoom', 'Maximize diagram']) {
+      const button = group.getByRole('button', {name});
+      await expect(button.locator('svg')).toHaveCount(1);
+      // Nothing left that a missing font could fail to draw.
+      expect(((await button.textContent()) ?? '').trim()).toBe('');
+    }
 
     // `zoom=false` on the fence removes all of it.
     const optedOut = figures.nth(1);
@@ -339,7 +356,7 @@ test.describe('zoom and pan', () => {
     for (let index = 0; index < 3; index += 1) {
       await expect(figures.nth(index)).toHaveAttribute('data-plantuml-status', 'ready');
       // Still exactly one svg per figure: the toolbar uses text glyphs, not icons.
-      await expect(figures.nth(index).locator('svg')).toHaveCount(1);
+      await expect(figures.nth(index).locator(DIAGRAM_SVG)).toHaveCount(1);
     }
 
     expect(seen.pageErrors).toEqual([]);
