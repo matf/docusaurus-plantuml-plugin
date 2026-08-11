@@ -12,11 +12,15 @@ const TOTAL_DIAGRAMS = 4;
 
 /**
  * The request the engine makes when it resolves a namespace itself: a bare `<ns>.min.js`
- * against the page URL. On a docs site that is `/docs/c4.min.js`, which cannot exist. Its
- * absence is the whole point of the loader, so every test here checks for it.
+ * against the page URL, which on a docs site cannot exist. Its absence is the whole point of
+ * the loader, so every test here checks for it.
+ *
+ * Defined as "any bundle request that did not come from the plugin's assets directory",
+ * rather than by matching the page path — the page path varies with the route, and a pattern
+ * written around one route silently stops catching anything on a deeper one.
  */
 function pageRelativeBundleRequests(requests: string[]): string[] {
-  return requests.filter((url) => /\/docs\/[^/]*\.min\.js$/.test(url));
+  return requests.filter((url) => /\.min\.js$/.test(url) && !/\/stdlib-[0-9a-f]+\//.test(url));
 }
 
 test.describe('PlantUML standard library', () => {

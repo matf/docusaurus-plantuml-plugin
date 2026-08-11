@@ -89,6 +89,30 @@ describe('generating a namespace bundle', () => {
     expect(() => buildStdlibNamespace(root, 'awslib')).toThrow(/is not valid JSON/);
   });
 
+  it('unwraps a sprite file that is a whole @startuml document', () => {
+    // 81 of cloudinsight's 83 files are written this way. PlantUML's file-based `!include`
+    // takes the contents; the standard library lookup does not, and the diagram then fails
+    // on a nested `@startuml`.
+    const root = fixture({'x/java.puml': '@startuml\nsprite $java [4x4/16] {\n0000\n}\n@enduml\n'});
+    const {stdlib} = evaluate(buildStdlibNamespace(root, 'x').script);
+
+    expect(stdlib.x?.java).toEqual(['sprite $java [4x4/16] {', '0000', '}']);
+  });
+
+  it('leaves a multi-block file alone, where the markers separate the blocks', () => {
+    const root = fixture({'x/two.puml': '@startuml\nfirst\n@enduml\n@startuml\nsecond\n@enduml\n'});
+    const {stdlib} = evaluate(buildStdlibNamespace(root, 'x').script);
+
+    expect(stdlib.x?.two?.[0]).toBe('@startuml');
+  });
+
+  it('leaves an ordinary library file alone', () => {
+    const root = fixture({'x/lib.puml': '!define FOO\nbody\n'});
+    const {stdlib} = evaluate(buildStdlibNamespace(root, 'x').script);
+
+    expect(stdlib.x?.lib).toEqual(['!define FOO', 'body', '']);
+  });
+
   it('publishes the README front matter as the namespace info', () => {
     const root = fixture({
       'C4/README.md': '---\nname: C4\nversion: 2.13.0\nlicense: MIT\n---\n\nProse.\n',

@@ -147,6 +147,35 @@ function toJsonLiteral(text: string, file?: string): string {
   }
 }
 
+/**
+ * Unwraps a library file that is itself a complete `@startuml … @enduml` document.
+ *
+ * PlantUML's file-based `!include` takes the *contents* of such a file rather than the
+ * document markers, but the standard library lookup this bundle feeds does not: the markers
+ * come through verbatim and the diagram fails on a nested `@startuml`. That is not a corner
+ * case — 81 of `cloudinsight`'s 83 sprite files are written this way, which would leave the
+ * whole namespace unusable.
+ *
+ * Only a single-block file is unwrapped. A file with more than one `@startuml` is left alone,
+ * because there the markers are what separates one block from the next.
+ *
+ * (`!include <ns/file!0>`, which selects a block by index, does not work through the standard
+ * library lookup either way — verified against the engine — so nothing is lost by unwrapping.)
+ */
+function unwrapDocument(lines: string[]): string[] {
+  if (lines.filter((line) => /^@startuml\b/.test(line.trim())).length !== 1) return lines;
+
+  let first = 0;
+  while (first < lines.length && lines[first]?.trim() === '') first += 1;
+  if (!/^@startuml\b/.test(lines[first]?.trim() ?? '')) return lines;
+
+  let last = lines.length - 1;
+  while (last > first && lines[last]?.trim() === '') last -= 1;
+  if (lines[last]?.trim() !== '@enduml') return lines;
+
+  return lines.slice(first + 1, last);
+}
+
 /** Strips the extension the way the engine does before looking a name up. */
 function withoutExtension(key: string): string {
   return key.replace(/\.(puml|json)$/, '');
@@ -200,7 +229,7 @@ export function buildStdlibNamespace(
     // globals differently, joining the first with newlines and indexing into the second.
     const value =
       file.extension === '.puml'
-        ? toJsLiteral(text.split(/\r\n|\r|\n/))
+        ? toJsLiteral(unwrapDocument(text.split(/\r\n|\r|\n/)))
         : toJsonLiteral(text, file.absolutePath);
     lines.push(
       `  ${target}[${toJsLiteral(bare)}] = ${target}[${toJsLiteral(file.key)}] = ${value};`,

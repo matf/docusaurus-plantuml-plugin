@@ -12,10 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **The PlantUML standard library.** `!include <C4/C4_Container>` now renders, with no
-  configuration and nothing to install. Nine namespaces ship with the plugin — `c4`,
-  `archimate`, `eip`, `k8s`, `kubernetes`, `azure`, `office`, `cloudinsight` and `domainstory` —
-  and a page downloads only the ones its diagrams actually include. A C4 page costs 29 KB
-  gzipped; a page with no standard library include costs nothing.
+  configuration and nothing to install. Eight namespaces ship with the plugin — `c4`,
+  `archimate`, `eip`, `k8s`, `kubernetes`, `azure`, `office` and `cloudinsight` — and a page
+  downloads only the ones its diagrams actually include. A C4 page costs 29 KB gzipped; a page
+  with no standard library include costs nothing.
 
   Four details are worth knowing:
   - **Bundles are served from your own `baseUrl`**, like every other asset. Left to itself the
@@ -47,11 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **PlantUML's preprocessor failures are now reported as errors** rather than passed through as
   successfully rendered pictures. Calling a macro the included library does not define
-  (`Function not found RelIndex`) or naming a file that is not in a namespace
-  (`cannot include <C4/C4_Nope>`) produces an error card with no `Syntax Error?` marker on it,
-  so the existing detection missed both. They are the two likeliest ways a standard library
+  (`Function not found RelIndex`), naming a file that is not in a namespace
+  (`cannot include <C4/C4_Nope>`) and an include that could not be resolved at all
+  (`Fatal parsing error`) all produce an error card with no `Syntax Error?` marker on it, so
+  the existing detection missed all three. They are the likeliest ways a standard library
   diagram goes wrong, which is how this surfaced. The panel shows the failure alone rather
   than the thousands of macro-expanded lines it is buried in.
+- **Library files that are themselves whole `@startuml … @enduml` documents** are unwrapped when
+  the bundle is generated, the way PlantUML's file-based `!include` does. The standard library
+  lookup passes the markers through verbatim, and a nested `@startuml` fails the diagram — 81 of
+  `cloudinsight`'s 83 sprite files are written that way, so the namespace was unusable without
+  this. Files with more than one block are left alone.
 
 ### Changed
 

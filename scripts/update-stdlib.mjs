@@ -24,6 +24,12 @@
  * namespaces — aws, ibm, tupadr3, material7.4.47 and awslib14/20 — account for 95% of it.
  * Those stay opt-in the same way. Everything here fits in ~3 MB, and a reader only ever
  * downloads the namespaces the page in front of them actually uses.
+ *
+ * One namespace fails both tests at once and is worth naming: `DomainStory` is 35 KB and MIT
+ * licensed, but every element it draws resolves an icon out of `material2.1.19`, so it cannot
+ * render at all without 6.8 MB of icons alongside it. Vendoring it on its own would ship a
+ * namespace that does not work; it is reachable through `stdlib.include` together with
+ * `material2.1.19` for anyone who wants it.
  */
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
@@ -37,7 +43,6 @@ const UPSTREAM_COMMIT = 'bdbb819f76c75e7a23af582b2a63ea7dc43eed7c';
 /** Namespace directories to vendor, spelled as upstream spells them. */
 const NAMESPACES = [
   'C4',
-  'DomainStory',
   'archimate',
   'azure',
   'cloudinsight',

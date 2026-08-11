@@ -39,13 +39,16 @@ const NOT_SUPPORTED_HEADING = 'Diagram not supported by this release of PlantUML
 /**
  * Failures raised by PlantUML's *preprocessor* rather than by its parser.
  *
- * These matter far more now that `!include <namespace/…>` is resolvable: calling a macro the
- * included version does not define, or naming a file that is not in the namespace, are the
- * two most likely ways a standard library diagram goes wrong. Neither produces the
- * `Syntax Error?` marker below — the picture says only `Function not found RelIndex` — so
- * without this signature the engine's error card was passed through as a successful render.
+ * These matter far more now that `!include <namespace/…>` is resolvable. Calling a macro the
+ * included version does not define, naming a file that is not in the namespace, and an
+ * include the preprocessor could not resolve at all are the three likeliest ways a standard
+ * library diagram goes wrong. *None* of them produces the `Syntax Error?` marker below — the
+ * picture says only `Function not found RelIndex`, `cannot include <…>` or `Fatal parsing
+ * error` — so without this signature the engine's error card was passed through as a
+ * successful render.
  */
-const PREPROCESSOR_FAILURE_PATTERN = /^\s*(?:function not found|cannot include)\b/i;
+const PREPROCESSOR_FAILURE_PATTERN =
+  /^\s*(?:function not found|cannot include|fatal parsing error)\b/i;
 
 /**
  * The header PlantUML puts above the source listing in every error picture. Required to

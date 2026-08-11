@@ -431,6 +431,9 @@ The standard library in full is **265 MB** of source (28 MB gzipped), most of it
 for most of the rest. Shipping that in an npm package is not reasonable, and several other
 namespaces — `classy`, `classy-c4`, `cloudogu`, `edgy`, `elastic`, `gcp`, `osa2` — declare no
 licence at all upstream, which makes redistributing them your call rather than this package's.
+`domainstory` is left out for a third reason: it is small and MIT licensed, but every element it
+draws resolves an icon out of `material2.1.19`, so it cannot render without 6.8 MB of icons
+beside it — use it with `include: ['domainstory', 'material2.1.19']`.
 
 Any of them can be added from your own checkout:
 

@@ -100,12 +100,21 @@ dependency would drag 6.8 MB of icons into a branch the diagram probably never t
 dependency the site does not provide is likewise skipped rather than raised, for the same
 reason.
 
-### One deviation from upstream's generator, on purpose
+### Two deviations from upstream's generator, on purpose
 
-Upstream strips `.puml` from the keys, while the engine looks the name up exactly as written.
-`!include <C4/C4_Container.puml>` — the spelling C4-PlantUML's own documentation uses — therefore
-cannot resolve against an upstream bundle. Every entry here is registered under both spellings,
-sharing one array, so the alias costs no memory and a little file size.
+**Both spellings of a name are registered.** Upstream strips `.puml` from the keys, while the
+engine looks the name up exactly as written. `!include <C4/C4_Container.puml>` — the spelling
+C4-PlantUML's own documentation uses — therefore cannot resolve against an upstream bundle.
+Every entry here is registered under both spellings, sharing one array, so the alias costs no
+memory and a little file size.
+
+**A file that is a whole `@startuml … @enduml` document is unwrapped.** PlantUML's file-based
+`!include` takes the contents of such a file; the standard library lookup passes the markers
+through verbatim, and the diagram then fails on a nested `@startuml`. 81 of `cloudinsight`'s 83
+sprite files are written this way, so without unwrapping the namespace does not work at all.
+Only single-block files are unwrapped — in a multi-block file the markers are what separates
+the blocks — and `!include <ns/file!0>`, which selects a block by index, was verified not to
+work through this lookup either way, so nothing is lost.
 
 ### The vendored set is curated, on two criteria
 
@@ -116,10 +125,17 @@ that permits redistribution. plantuml-stdlib has no top-level licence and leaves
 namespaces that declare nothing are left out — redistributing them is the site owner's call, not
 this package's.
 
-**Size second.** What remains and fits is nine namespaces, ~3 MB unpacked and ~0.7 MB packed.
+**Size second.** What remains and fits is eight namespaces, ~2.9 MB unpacked and ~0.7 MB packed.
 That is a twelvefold increase in the published package, which is why `verify-package.mjs` now
 budgets the standard library separately from the plugin's own code: vendoring more can never
 quietly pay for the compiled plugin growing.
+
+One namespace was dropped for a third reason, and it is the one worth remembering: `DomainStory`
+is 35 KB and MIT licensed, but every element it draws resolves an icon out of `material2.1.19`,
+so it cannot render without 6.8 MB of icons beside it. Shipping it alone would have shipped a
+namespace that does not work. The dependency is invisible to the manifest because the include is
+computed — `!include <material2.1.19/$icon>` — which is exactly the case the scanner skips, so
+nothing but rendering the thing would have caught it.
 
 Everything else is reachable through `stdlib.include` plus `stdlib.source`, generated from the
 site's own checkout during its build and cached under `.docusaurus`.

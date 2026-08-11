@@ -12,7 +12,6 @@ not the library content.
 | Namespace | Library | Version | Licence | Upstream |
 | --- | --- | --- | --- | --- |
 | `c4` | C4 (C4-PlantUML) | 2.13.0 | MIT | <https://github.com/plantuml-stdlib/C4-PlantUML> |
-| `domainstory` | DomainStory | 0.4.0 | MIT License | <https://github.com/johthor/DomainStory-PlantUML> |
 | `archimate` | Archimate | 3.2.2 | MIT | <https://github.com/plantuml-stdlib/Archimate-PlantUML> |
 | `azure` | Azure | 2.2.0 | MIT | <https://github.com/plantuml-stdlib/Azure-PlantUML> |
 | `cloudinsight` | Cloudinsight | 1.0.0 | MIT | <https://github.com/plantuml-stdlib/cicon-plantuml-sprites> |

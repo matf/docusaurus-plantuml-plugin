@@ -9,7 +9,7 @@
     "c4": {
       "directory": "C4",
       "file": "c4.min.js",
-      "bytes": 217416,
+      "bytes": 217266,
       "files": 37,
       "dependencies": [],
       "exampleDependencies": [
@@ -20,22 +20,10 @@
       "license": "MIT",
       "source": "https://github.com/plantuml-stdlib/C4-PlantUML"
     },
-    "domainstory": {
-      "directory": "DomainStory",
-      "file": "domainstory.min.js",
-      "bytes": 35962,
-      "files": 2,
-      "dependencies": [],
-      "exampleDependencies": [],
-      "displayName": "DomainStory",
-      "version": "0.4.0",
-      "license": "MIT License",
-      "source": "https://github.com/johthor/DomainStory-PlantUML"
-    },
     "archimate": {
       "directory": "archimate",
       "file": "archimate.min.js",
-      "bytes": 154205,
+      "bytes": 154133,
       "files": 12,
       "dependencies": [],
       "exampleDependencies": [],
@@ -47,7 +35,7 @@
     "azure": {
       "directory": "azure",
       "file": "azure.min.js",
-      "bytes": 549155,
+      "bytes": 549055,
       "files": 295,
       "dependencies": [],
       "exampleDependencies": [
@@ -61,7 +49,7 @@
     "cloudinsight": {
       "directory": "cloudinsight",
       "file": "cloudinsight.min.js",
-      "bytes": 202171,
+      "bytes": 200152,
       "files": 83,
       "dependencies": [],
       "exampleDependencies": [],
@@ -73,7 +61,7 @@
     "eip": {
       "directory": "eip",
       "file": "eip.min.js",
-      "bytes": 51969,
+      "bytes": 51900,
       "files": 4,
       "dependencies": [],
       "exampleDependencies": [],
@@ -85,7 +73,7 @@
     "k8s": {
       "directory": "k8s",
       "file": "k8s.min.js",
-      "bytes": 52390,
+      "bytes": 52365,
       "files": 42,
       "dependencies": [
         "c4"
@@ -111,7 +99,7 @@
     "office": {
       "directory": "office",
       "file": "office.min.js",
-      "bytes": 1490199,
+      "bytes": 1490024,
       "files": 547,
       "dependencies": [],
       "exampleDependencies": [],

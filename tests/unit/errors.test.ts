@@ -106,6 +106,23 @@ describe('diagram error detection', () => {
     ).toBeNull();
   });
 
+  it('detects an include the preprocessor could not resolve at all', () => {
+    // What a missing namespace produces: no `Syntax Error?` marker, just this.
+    expect(
+      detectDiagramError(
+        errorSvg([
+          ...VERSION_NAG,
+          '[From &lt;DomainStory/domainStory&gt; (line 198) ]',
+          '@startuml',
+          '!include &lt;DomainStory/domainStory&gt;',
+          '... ( skipping 4937 lines )',
+          '    !include &lt;material2.1.19/$icon&gt;',
+          'Fatal parsing error',
+        ]),
+      ),
+    ).toBe('Fatal parsing error');
+  });
+
   it('detects an unsupported-directive picture', () => {
     expect(
       detectDiagramError(
