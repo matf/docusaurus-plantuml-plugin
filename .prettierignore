@@ -11,3 +11,4 @@ package-lock.json
 CHANGELOG.md
 *.tgz
 docs/spec.md
+assets/stdlib/

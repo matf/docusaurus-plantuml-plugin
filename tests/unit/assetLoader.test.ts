@@ -296,7 +296,8 @@ describe('the Graphviz runtime', () => {
     await expect(failing).rejects.toThrow(/Failed to load the Graphviz runtime/);
     expect(isVizRuntimeRequested()).toBe(false);
 
-    resetRuntimeLoader();
+    // No reset in between: a diagram further down the page must get a real second attempt,
+    // which means the dead script tag is replaced rather than reused.
     const retry = loadVizRuntime({assetsBaseUrl: ASSETS, timeoutMs: 1_000});
     await settleScript('load');
     await expect(retry).resolves.toMatchObject({graphvizVersion: '14.1.1'});

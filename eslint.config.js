@@ -16,6 +16,8 @@ export default tseslint.config(
       '.tmp-integration/**',
       'test-results/**',
       'playwright-report/**',
+      // Generated stdlib bundles: megabytes of upstream content, not this project's source.
+      'assets/stdlib/**',
     ],
   },
   js.configs.recommended,

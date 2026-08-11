@@ -243,7 +243,7 @@ export default function PlantUmlDiagram({
             transparentBackground: options.graphviz.transparentBackground,
             maxSourceBytes: options.graphviz.maxSourceBytes,
           })
-        : renderDiagram({...shared, dark: renderDark});
+        : renderDiagram({...shared, dark: renderDark, stdlib: config.stdlib});
 
     void pending
       .then((svg) => commit({status: 'ready', svg, error: null}))
@@ -264,6 +264,7 @@ export default function PlantUmlDiagram({
     config,
     config?.assetsBaseUrl,
     config?.coreVersion,
+    config?.stdlib,
     config?.options.sanitizeSvg,
     config?.options.renderTimeoutMs,
     config?.options.cache,

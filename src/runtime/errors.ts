@@ -1,7 +1,16 @@
 import type {VizRenderError} from './types.js';
 
 export type PlantUmlErrorKind =
-  'load' | 'engine' | 'diagram' | 'syntax' | 'timeout' | 'config' | 'aborted' | 'too-large';
+  | 'load'
+  | 'engine'
+  | 'diagram'
+  | 'syntax'
+  | 'timeout'
+  | 'config'
+  | 'aborted'
+  | 'too-large'
+  /** A `!include <namespace/…>` the site cannot resolve. */
+  | 'stdlib';
 
 /** Every failure surfaced to the UI is one of these, so the panel can explain what broke. */
 export class PlantUmlError extends Error {
@@ -26,6 +35,27 @@ const BOILERPLATE_PATTERNS = [
 ];
 
 const NOT_SUPPORTED_HEADING = 'Diagram not supported by this release of PlantUML';
+
+/**
+ * Failures raised by PlantUML's *preprocessor* rather than by its parser.
+ *
+ * These matter far more now that `!include <namespace/…>` is resolvable. Calling a macro the
+ * included version does not define, naming a file that is not in the namespace, and an
+ * include the preprocessor could not resolve at all are the three likeliest ways a standard
+ * library diagram goes wrong. *None* of them produces the `Syntax Error?` marker below — the
+ * picture says only `Function not found RelIndex`, `cannot include <…>` or `Fatal parsing
+ * error` — so without this signature the engine's error card was passed through as a
+ * successful render.
+ */
+const PREPROCESSOR_FAILURE_PATTERN =
+  /^\s*(?:function not found|cannot include|fatal parsing error)\b/i;
+
+/**
+ * The header PlantUML puts above the source listing in every error picture. Required to
+ * co-occur with the line above, so that a diagram merely containing the words "cannot
+ * include" in a note is not mistaken for a failure.
+ */
+const SOURCE_LISTING_PATTERN = /^\[From .+\(line \d+\)/;
 
 function textNodesOf(svg: string): string[] {
   if (typeof DOMParser === 'undefined') return [];
@@ -62,7 +92,18 @@ export function detectDiagramError(svg: string): string | null {
     texts.some((text) => text.includes(NOT_SUPPORTED_HEADING)) &&
     texts.some((text) => text.includes('is not recognized.'));
 
-  if (!isSyntaxError && !isEmptyDescription && !isUnsupported) return null;
+  const preprocessorFailures = texts.filter((text) => PREPROCESSOR_FAILURE_PATTERN.test(text));
+  const isPreprocessorError =
+    preprocessorFailures.length > 0 && texts.some((text) => SOURCE_LISTING_PATTERN.test(text));
+
+  if (!isSyntaxError && !isEmptyDescription && !isUnsupported && !isPreprocessorError) return null;
+
+  // A preprocessor failure lists the *expanded* source, which for a standard library macro
+  // runs to thousands of lines. The failure itself is the only part worth showing; the
+  // reader still has the original fence a click away in the source view.
+  if (isPreprocessorError && !isSyntaxError) {
+    return preprocessorFailures.map((text) => text.trim()).join('\n');
+  }
 
   const meaningful = texts
     .map((text) => text.replace(/\s+$/, ''))

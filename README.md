@@ -244,9 +244,10 @@ props untouched. Existing code-block behaviour (highlighting, line numbers, titl
 | `zoom`              | `boolean`                         | `true`                 | Let readers zoom and pan diagrams. Adds a control toolbar and a focusable viewport. Override per fence with `zoom=false`.           |
 | `showSource`        | `boolean`                         | `true`                 | Offer a toolbar control that reveals the diagram source and copies it to the clipboard. Override per fence with `showSource=false`. |
 | `graphviz`          | `object`                          | see below              | Graphviz/DOT support. See [Graphviz options](#graphviz-options).                                                                    |
+| `stdlib`            | `object \| false`                 | see below              | PlantUML standard library (`!include <C4/…>`). See [Standard library options](#standard-library-options).                           |
 | `id`                | `string`                          | `'default'`            | Docusaurus plugin instance id; only relevant if you register the plugin more than once.                                             |
 
-Every option above except `graphviz` applies to **both** engines: `lazy`, `cache`,
+Every option above except `graphviz` and `stdlib` applies to **both** engines: `lazy`, `cache`,
 `sanitizeSvg`, `showSourceOnError`, `renderTimeoutMs`, `cacheMaxEntries` and `zoom` behave
 identically for a `dot` fence and a `plantuml` fence. `theme` is the exception — see
 [Light and dark mode](#light-and-dark-mode).
@@ -258,16 +259,17 @@ would otherwise silently disable the option you meant to set:
 ```text
 [docusaurus-plugin-plantuml-client] Unknown option 'sanitiseSvg'. Supported options:
 'languages', 'theme', 'lazy', 'cache', 'sanitizeSvg', 'showSourceOnError',
-'renderTimeoutMs', 'cacheMaxEntries', 'zoom', 'showSource', 'graphviz'.
+'renderTimeoutMs', 'cacheMaxEntries', 'zoom', 'showSource', 'graphviz', 'stdlib'.
 ```
 
 The same is true one level deeper, so `graphviz: {enigne: 'neato'}` fails the build rather than
 quietly doing nothing.
 
 `PlantUmlPluginOptions`, `ResolvedPlantUmlOptions`, `GraphvizOptions`,
-`ResolvedGraphvizOptions`, `GraphvizEngine`, `GRAPHVIZ_ENGINES`, `CacheMode`, `DiagramTheme`,
-`DEFAULT_OPTIONS`, `DEFAULT_GRAPHVIZ_OPTIONS`, `resolveOptions` and `PlantUmlOptionsError` are
-exported from the package root. The renderer, queue and cache internals are deliberately not
+`ResolvedGraphvizOptions`, `GraphvizEngine`, `GRAPHVIZ_ENGINES`, `StdlibOptions`,
+`ResolvedStdlibOptions`, `CacheMode`, `DiagramTheme`, `DEFAULT_OPTIONS`,
+`DEFAULT_GRAPHVIZ_OPTIONS`, `resolveOptions` and `PlantUmlOptionsError` are exported from the
+package root. The renderer, queue and cache internals are deliberately not
 exported.
 
 ## Graphviz (DOT) diagrams
@@ -377,6 +379,115 @@ large, and expect the page to stall while they render.
 
 The check happens **before** the engine is downloaded, so refusing an oversized diagram is
 free.
+
+## PlantUML standard library
+
+`!include <C4/C4_Container>` works out of the box. Nothing to install, nothing to configure:
+
+````markdown
+```plantuml title="C4 container diagram"
+@startuml
+!include <C4/C4_Container>
+
+Person(user, "Reader", "Reads the documentation")
+Container(browser, "Browser", "JavaScript", "Renders diagrams locally")
+Rel(user, browser, "Opens a page")
+@enduml
+```
+````
+
+Both spellings of the include resolve — `<C4/C4_Container>` and `<C4/C4_Container.puml>` —
+and so do the includes the library makes of _itself_: `C4_Container` pulls in `C4_Context`,
+`k8s/Common` pulls in `<c4/…>`, and none of that has to be written in the fence.
+
+### What is included, and what it costs
+
+Namespaces are fetched **per page, on demand**. A page with a C4 diagram downloads 29 KB
+gzipped; a page with no standard library include downloads nothing at all. The bundles are
+served from your own `baseUrl` like every other asset — no CDN, no plantuml.com.
+
+| Namespace      | Library              | Transfer | Licence    |
+| -------------- | -------------------- | -------- | ---------- |
+| `c4`           | C4-PlantUML          | 29 KB    | MIT        |
+| `archimate`    | Archimate-PlantUML   | 34 KB    | MIT        |
+| `eip`          | EIP-PlantUML         | 21 KB    | MIT        |
+| `k8s`          | kubernetes-PlantUML  | 23 KB    | MIT        |
+| `kubernetes`   | kubernetes sprites   | 221 KB   | Apache-2.0 |
+| `azure`        | Azure-PlantUML       | 160 KB   | MIT        |
+| `office`       | plantuml-office      | 160 KB   | MIT        |
+| `cloudinsight` | cicon sprites        | 24 KB    | MIT        |
+| `domainstory`  | DomainStory-PlantUML | 5 KB     | MIT        |
+
+Transfer figures are gzipped, per namespace, once per browsing session.
+[`assets/stdlib/LICENSES.md`](assets/stdlib/LICENSES.md) records the exact upstream version and
+licence of each. The bundles are generated from a pinned
+[plantuml-stdlib](https://github.com/plantuml/plantuml-stdlib) commit by
+`npm run stdlib:update`.
+
+### Namespaces that are not included
+
+The standard library in full is **265 MB** of source (28 MB gzipped), most of it icon sets:
+`aws` alone is 114 MB, and `ibm`, `tupadr3`, `material7.4.47` and `awslib14`/`awslib20` account
+for most of the rest. Shipping that in an npm package is not reasonable, and several other
+namespaces — `classy`, `classy-c4`, `cloudogu`, `edgy`, `elastic`, `gcp`, `osa2` — declare no
+licence at all upstream, which makes redistributing them your call rather than this package's.
+`domainstory` is left out for a third reason: it is small and MIT licensed, but every element it
+draws resolves an icon out of `material2.1.19`, so it cannot render without 6.8 MB of icons
+beside it — use it with `include: ['domainstory', 'material2.1.19']`.
+
+Any of them can be added from your own checkout:
+
+```bash
+git clone --depth 1 https://github.com/plantuml/plantuml-stdlib vendor/plantuml-stdlib
+```
+
+```ts
+{
+  stdlib: {
+    include: ['aws', 'tupadr3'],
+    source: 'vendor/plantuml-stdlib/stdlib',
+  },
+}
+```
+
+Bundles for those namespaces are generated during the build and cached under `.docusaurus`, so
+only the first build pays for it. Naming a namespace that _is_ vendored replaces it with the
+copy from your checkout, which is also how you pin a newer C4 than the one shipped here.
+
+### Standard library options
+
+| Option       | Type                 | Default | Description                                                                                                                        |
+| ------------ | -------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`    | `boolean`            | `true`  | Resolve `!include <namespace/…>` at all. `stdlib: false` is shorthand for `{enabled: false}`.                                      |
+| `include`    | `string[]`           | `[]`    | Extra namespaces to make available. Each must be found in `source`, or the build fails naming it.                                  |
+| `source`     | `string \| string[]` | `[]`    | `stdlib` directories of plantuml-stdlib checkouts, relative to the site directory or absolute. Required whenever `include` is set. |
+| `namespaces` | `string[]`           | all     | Narrow the vendored namespaces emitted into the build. Dependencies of the named ones are kept regardless.                         |
+
+Namespaces are matched case-insensitively, because the engine lower-cases `<C4/…>` before it
+looks anything up.
+
+### When a namespace is missing
+
+A diagram that includes a namespace the site does not provide gets the plugin's error panel,
+naming what is missing and how to add it — not PlantUML's grey "Fatal parsing error" picture:
+
+```text
+This diagram includes <aws/…>, but the 'aws' standard library namespace is not available on
+this site. Add it to the plugin's `stdlib.include` option and point `stdlib.source` at a
+plantuml-stdlib checkout that contains it.
+```
+
+### Turning it off
+
+```ts
+{
+  stdlib: false;
+}
+```
+
+Nothing is emitted into the build, and a diagram with a standard library include says so
+instead of failing inside the engine. See
+[ADR 0005](docs/adr/0005-stdlib-bundles.md) for why the bundles are loaded the way they are.
 
 ## Light and dark mode
 
@@ -728,16 +839,17 @@ wrapper carries `data-plantuml-status="error"`.
 
 Failures are classified internally as one of:
 
-| Kind        | Cause                                                                                                                                                          |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `load`      | `viz-global.js` or `plantuml.js` could not be fetched, timed out, or was not the expected module (usually a proxy or service worker returning the wrong file). |
-| `engine`    | The engine threw, or its output could not be used at all.                                                                                                      |
-| `diagram`   | The source is not valid PlantUML.                                                                                                                              |
-| `syntax`    | The source is not valid DOT. Carries Graphviz's own diagnostic, including the line number.                                                                     |
-| `too-large` | A DOT source exceeded `graphviz.maxSourceBytes`.                                                                                                               |
-| `timeout`   | One render exceeded `renderTimeoutMs`.                                                                                                                         |
-| `config`    | The plugin's global data is missing, or a fence named a layout engine this Graphviz build does not have.                                                       |
-| `aborted`   | The component unmounted or re-rendered; not surfaced to the reader.                                                                                            |
+| Kind        | Cause                                                                                                                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `load`      | `viz-global.js` or `plantuml.js` could not be fetched, timed out, or was not the expected module (usually a proxy or service worker returning the wrong file).                         |
+| `engine`    | The engine threw, or its output could not be used at all.                                                                                                                              |
+| `diagram`   | The source is not valid PlantUML.                                                                                                                                                      |
+| `syntax`    | The source is not valid DOT. Carries Graphviz's own diagnostic, including the line number.                                                                                             |
+| `too-large` | A DOT source exceeded `graphviz.maxSourceBytes`.                                                                                                                                       |
+| `stdlib`    | A `!include <namespace/…>` names a standard library namespace this site does not provide, or the standard library is switched off. See [Standard library](#plantuml-standard-library). |
+| `timeout`   | One render exceeded `renderTimeoutMs`.                                                                                                                                                 |
+| `config`    | The plugin's global data is missing, or a fence named a layout engine this Graphviz build does not have.                                                                               |
+| `aborted`   | The component unmounted or re-rendered; not surfaced to the reader.                                                                                                                    |
 
 The two engines report invalid source very differently:
 
@@ -745,6 +857,10 @@ The two engines report invalid source very differently:
   an "error picture" and reports success, so the rendered SVG is inspected for error markers
   before it is trusted. See [ADR 0002](docs/adr/0002-render-to-string.md) for the exact
   detection rules.
+- **Preprocessor failures carry no `Syntax Error?` marker at all** — `Function not found X`
+  after a macro that the included library version does not define, or `cannot include
+<C4/C4_Nope>` for a file that is not in the namespace. Both are detected by their own
+  signature, and the panel shows the failure rather than the expanded source it sits in.
 - **Invalid DOT is reported as structured data**, so the panel shows Graphviz's own message
   verbatim — `syntax error in line 3 near '}'` — with no heuristics involved.
 
@@ -798,6 +914,10 @@ The runtimes are large:
 | `viz-global.js` | ≈ 1.4 MB            | DOT fences, and PlantUML's own layout |
 | **Total**       | **≈ 8.2 MB**        |                                       |
 
+Standard library namespaces are separate again, and much smaller: one bundle per namespace, 5
+to 220 KB gzipped, fetched only by the pages whose diagrams include them. A C4 page adds 29 KB
+to the figures above; a page with no standard library include adds nothing.
+
 Crucially, **none of that is in your site's initial bundle**. The files are emitted as static
 assets, not imported into the webpack graph (the dynamic import is marked `webpackIgnore`), so:
 
@@ -813,9 +933,12 @@ assets, not imported into the webpack graph (the dynamic import is marked `webpa
 **Adding Graphviz support to a site that already renders PlantUML costs nothing**, because
 `viz-global.js` was already being emitted and loaded.
 
-The published npm package itself is small (the compiled plugin and theme components only);
-the 8 MB comes from the `@plantuml/core` dependency and lands in your build output, not in
-your JavaScript bundle. Budget for roughly 8 MB of extra static assets per deployed site.
+The published npm package is the compiled plugin, its theme components, and ~3 MB of vendored
+standard library bundles; the 8 MB engine comes from the `@plantuml/core` dependency. Both land
+in your build output rather than in your JavaScript bundle, so budget for roughly 11 MB of
+extra static assets per deployed site — of which a given reader downloads the 8 MB engine once
+and only the standard library namespaces their pages actually use. `stdlib.namespaces` narrows
+what is emitted if the build output size matters more to you than which diagrams keep working.
 
 Serve these assets with compression enabled — they are ordinary JavaScript and compress well.
 
@@ -1189,6 +1312,9 @@ Then rebuild. If it persists, remove `node_modules/.cache` and `.docusaurus/` by
   why zoom transforms a wrapper rather than the SVG.
 - [`docs/adr/0004-graphviz-engine-reuse.md`](docs/adr/0004-graphviz-engine-reuse.md) — why DOT
   is rendered with the Graphviz already inside `@plantuml/core`, and what that couples us to.
+- [`docs/adr/0005-stdlib-bundles.md`](docs/adr/0005-stdlib-bundles.md) — how `!include <C4/…>`
+  is resolved, why the engine's own loader has to be short-circuited, and how the vendored set
+  was chosen.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [`SECURITY.md`](SECURITY.md)
 

@@ -3,6 +3,7 @@ import {computeCacheKey, type DiagramCache} from './cache.js';
 import {describeEngineError, detectDiagramError, PlantUmlError} from './errors.js';
 import {enqueueRender} from './queue.js';
 import {sanitizeSvgMarkup} from './sanitize.js';
+import {loadStdlibForSource, type StdlibRuntime} from './stdlibLoader.js';
 import type {PlantUmlCoreModule} from './types.js';
 
 export interface RenderDiagramRequest {
@@ -12,6 +13,8 @@ export interface RenderDiagramRequest {
   timeoutMs: number;
   assetsBaseUrl: string;
   coreVersion: string;
+  /** Standard library assets for this site, or `null` when the feature is switched off. */
+  stdlib: StdlibRuntime | null;
   cache: DiagramCache;
   signal?: AbortSignal;
   /** Reports which long-running phase is in progress, so the UI can show an accurate state. */
@@ -64,20 +67,33 @@ function renderWithEngine(
  * {@link enqueueRender} because the engine cannot render two diagrams at once.
  */
 export async function renderDiagram(request: RenderDiagramRequest): Promise<string> {
-  const {source, dark, sanitize, timeoutMs, cache, coreVersion, signal, onPhase} = request;
+  const {source, dark, sanitize, timeoutMs, cache, coreVersion, stdlib, signal, onPhase} = request;
 
-  const cacheKey = computeCacheKey({source, dark, sanitized: sanitize, coreVersion});
+  const cacheKey = computeCacheKey({
+    source,
+    dark,
+    sanitized: sanitize,
+    coreVersion,
+    stdlibRevision: stdlib?.manifest.revision ?? null,
+  });
   const cached = cache.get(cacheKey);
   if (cached !== undefined) return cached;
 
   // Loading happens outside the queue: it is shared, idempotent work, and holding the
   // single render slot for an 8 MB download would stall every other diagram on the page.
+  //
+  // The standard library loads alongside the engine rather than after it. The two are
+  // independent downloads, and the engine cannot be asked for a diagram whose includes are
+  // not resolvable yet — by the time it looks, the namespaces have to be in place already.
   onPhase?.('loading');
-  const engine = await loadPlantUmlRuntime({
-    assetsBaseUrl: request.assetsBaseUrl,
-    timeoutMs,
-    importModule: request.importModule,
-  });
+  const [engine] = await Promise.all([
+    loadPlantUmlRuntime({
+      assetsBaseUrl: request.assetsBaseUrl,
+      timeoutMs,
+      importModule: request.importModule,
+    }),
+    loadStdlibForSource({source, stdlib, timeoutMs}),
+  ]);
 
   onPhase?.('rendering');
   const svg = await enqueueRender(

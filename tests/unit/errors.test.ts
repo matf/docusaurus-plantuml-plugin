@@ -61,6 +61,68 @@ describe('diagram error detection', () => {
     ).toContain('Empty description');
   });
 
+  it('detects a macro that the included library does not define', () => {
+    // Calling `RelIndex(a, b, "x")` after `!include <C4/C4_Dynamic>` produces exactly this:
+    // no `Syntax Error?` marker anywhere, so without its own signature the engine's error
+    // card was passed through as a successful render.
+    const message = detectDiagramError(
+      errorSvg([
+        ...VERSION_NAG,
+        '[From textarea (line 12) ]',
+        '@startuml',
+        '!include &lt;C4/C4_Dynamic&gt;',
+        '... ( skipping 15840 lines )',
+        'RelIndex(a, b, "x")',
+        ' Function not found RelIndex',
+      ]),
+    );
+
+    // Only the failure, not the thousands of expanded lines it is buried in.
+    expect(message).toBe('Function not found RelIndex');
+  });
+
+  it('detects a file that is missing from an included namespace', () => {
+    expect(
+      detectDiagramError(
+        errorSvg([
+          ...VERSION_NAG,
+          '[From textarea (line 2) ]',
+          '@startuml',
+          '!include &lt;C4/C4_Nope&gt;',
+          ' cannot include &lt;C4/C4_Nope&gt;',
+        ]),
+      ),
+      // Entities are decoded by the parser, so the reader sees the include as they wrote it.
+    ).toBe('cannot include <C4/C4_Nope>');
+  });
+
+  it('does not mistake a diagram that merely talks about includes for a failure', () => {
+    // The failure phrase alone is not enough; PlantUML's source-listing header has to be
+    // there too, and a real diagram never has one.
+    expect(
+      detectDiagramError(
+        errorSvg(['Alice -> Bob : cannot include the old client', 'Bob --> Alice : noted']),
+      ),
+    ).toBeNull();
+  });
+
+  it('detects an include the preprocessor could not resolve at all', () => {
+    // What a missing namespace produces: no `Syntax Error?` marker, just this.
+    expect(
+      detectDiagramError(
+        errorSvg([
+          ...VERSION_NAG,
+          '[From &lt;DomainStory/domainStory&gt; (line 198) ]',
+          '@startuml',
+          '!include &lt;DomainStory/domainStory&gt;',
+          '... ( skipping 4937 lines )',
+          '    !include &lt;material2.1.19/$icon&gt;',
+          'Fatal parsing error',
+        ]),
+      ),
+    ).toBe('Fatal parsing error');
+  });
+
   it('detects an unsupported-directive picture', () => {
     expect(
       detectDiagramError(

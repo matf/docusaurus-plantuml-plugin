@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0]
+
+### Added
+
+- **The PlantUML standard library.** `!include <C4/C4_Container>` now renders, with no
+  configuration and nothing to install. Eight namespaces ship with the plugin — `c4`,
+  `archimate`, `eip`, `k8s`, `kubernetes`, `azure`, `office` and `cloudinsight` — and a page
+  downloads only the ones its diagrams actually include. A C4 page costs 29 KB gzipped; a page
+  with no standard library include costs nothing.
+
+  Four details are worth knowing:
+  - **Bundles are served from your own `baseUrl`**, like every other asset. Left to itself the
+    engine resolves a namespace against the *current page* — `/docs/architecture/c4.min.js` —
+    which cannot exist, and pre-populating its global does not stop it. The plugin loads the
+    bundle from the assets directory and then tells the engine the work is done. See
+    [ADR 0005](docs/adr/0005-stdlib-bundles.md).
+  - **Includes the library makes of itself are resolved too**, from an index built when the
+    bundles are generated. `k8s/Common` needs `<c4/…>`, and the engine would only discover that
+    mid-render, with no chance to fetch it.
+  - **`!include <C4/C4_Container.puml>` works**, spelled with the extension. Upstream's own
+    bundles cannot resolve that spelling, even though C4-PlantUML's documentation uses it.
+  - **A missing namespace is explained, not dumped on the reader.** The panel names the
+    namespace and the option that adds it, instead of PlantUML's grey "Fatal parsing error".
+
+- `stdlib` plugin option: `stdlib: false` switches the feature off entirely; `stdlib.include`
+  plus `stdlib.source` add namespaces from a `plantuml-stdlib` checkout — including the icon
+  libraries that are far too large to vendor, such as `aws`, `ibm` and `tupadr3` — and
+  `stdlib.namespaces` narrows what a build emits.
+- `stdlib` error kind, for an include the site cannot resolve.
+- `npm run stdlib:update`, which regenerates the vendored bundles from a pinned
+  plantuml-stdlib commit. It is maintainer-only and never part of `npm run build`, so site
+  builds stay offline and hermetic.
+- `assets/stdlib/LICENSES.md`, recording the upstream project, version and licence of every
+  vendored namespace. Namespaces whose upstream declares no licence are deliberately not
+  vendored; `stdlib.include` remains available for anyone who wants them.
+
+### Fixed
+
+- **PlantUML's preprocessor failures are now reported as errors** rather than passed through as
+  successfully rendered pictures. Calling a macro the included library does not define
+  (`Function not found RelIndex`), naming a file that is not in a namespace
+  (`cannot include <C4/C4_Nope>`) and an include that could not be resolved at all
+  (`Fatal parsing error`) all produce an error card with no `Syntax Error?` marker on it, so
+  the existing detection missed all three. They are the likeliest ways a standard library
+  diagram goes wrong, which is how this surfaced. The panel shows the failure alone rather
+  than the thousands of macro-expanded lines it is buried in.
+- **Library files that are themselves whole `@startuml … @enduml` documents** are unwrapped when
+  the bundle is generated, the way PlantUML's file-based `!include` does. The standard library
+  lookup passes the markers through verbatim, and a nested `@startuml` fails the diagram — 81 of
+  `cloudinsight`'s 83 sprite files are written that way, so the namespace was unusable without
+  this. Files with more than one block are left alone.
+
+### Changed
+
+- A script asset that fails to load is now replaced rather than reused when a later diagram
+  retries, so one flaky response no longer disables the engine — or a standard library
+  namespace — for the rest of the page.
+- The render cache key includes the standard library revision, so refreshing it cannot serve a
+  picture rendered against the old one.
+- The published package grows from 77 KB to ~776 KB packed (245 KB to ~3.2 MB unpacked); the
+  difference is the vendored bundles. `verify-package.mjs` budgets them separately from the
+  plugin's own code, which keeps its own 400 KB ceiling.
+
 ## [1.2.0]
 
 ### Added
@@ -284,7 +347,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.0...v1.1.1
