@@ -186,9 +186,14 @@ describe('accessible structure', () => {
     expect(within(canvas).queryByRole('group', {name: /zoom controls/})).toBeNull();
   });
 
-  it('adds no extra svg element, which would break diagram counting', async () => {
+  it('keeps the diagram the only svg inside the role="img" container', async () => {
+    // The documented selector is `div[role="img"] > svg`, and it has to stay unambiguous:
+    // the toolbar's icons are SVG too, but they live outside this subtree.
     await renderReady();
-    expect(figure().querySelectorAll('svg')).toHaveLength(1);
+
+    const canvas = figure().querySelector('div[role="img"]') as HTMLElement;
+    expect(canvas.querySelectorAll('svg')).toHaveLength(1);
+    expect(canvas.querySelector(':scope > svg')).not.toBeNull();
   });
 
   it('names the control group after the diagram', async () => {
@@ -206,6 +211,30 @@ describe('accessible structure', () => {
     expect(screen.getByRole('button', {name: 'Zoom out'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Reset zoom'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Maximize diagram'})).toBeInTheDocument();
+  });
+
+  it('draws every control as SVG rather than as a font character', async () => {
+    // `⛶` U+26F6 has no glyph in any font a stock Linux desktop ships, so the maximize
+    // control rendered as a tofu box; the others only worked because DejaVu Sans happened to
+    // be installed. See issue #21.
+    await renderReady();
+
+    for (const name of ['Zoom in', 'Zoom out', 'Reset zoom', 'Maximize diagram']) {
+      const button = screen.getByRole('button', {name});
+      expect(button.querySelector('svg'), `${name} should be drawn`).toBeInTheDocument();
+      // Nothing left for a missing font to fail to draw. This is the assertion that stops a
+      // later refactor from quietly reintroducing a symbol character.
+      expect(button.textContent ?? '').toMatch(/^[\x20-\x7e]*$/);
+    }
+  });
+
+  it('keeps the icons out of the accessibility tree', async () => {
+    await renderReady();
+
+    // The button's `aria-label` is the accessible name; the drawing must add nothing.
+    const icon = screen.getByRole('button', {name: 'Maximize diagram'}).querySelector('svg');
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+    expect(icon).toHaveAttribute('focusable', 'false');
   });
 
   it('describes the keyboard shortcuts without announcing them repeatedly', async () => {

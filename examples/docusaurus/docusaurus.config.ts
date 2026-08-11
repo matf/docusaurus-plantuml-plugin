@@ -18,6 +18,11 @@ const config: Config = {
   projectName: 'docusaurus-plantuml-plugin',
 
   onBrokenLinks: 'throw',
+  // Stays at the top level on purpose, deprecation warning and all. Docusaurus 3.9 moved this
+  // to `markdown.hooks.onBrokenMarkdownLinks`, but 3.5's `markdown` schema is a strict Joi
+  // object that rejects the key outright — and CI builds this fixture against 3.5.2, the
+  // oldest release the plugin's peer range claims. The old spelling is the only one that
+  // works across the whole supported range, which is exactly what this site is here to prove.
   onBrokenMarkdownLinks: 'throw',
 
   i18n: {

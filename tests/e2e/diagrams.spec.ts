@@ -8,6 +8,12 @@ const BASE_PATH = new URL(BASE_URL).pathname; // '/plantuml-test/'
 
 const diagram = '[data-plantuml-diagram]';
 
+/**
+ * The rendered diagram, as the README documents it. Scoped rather than a bare `svg` because
+ * the toolbar's control icons are SVG too — a loose selector would match those as well.
+ */
+const DIAGRAM_SVG = 'div[role="img"] > svg';
+
 test.describe('client-side PlantUML rendering', () => {
   test('renders a real SVG with the expected diagram labels', async ({page}) => {
     const seen = monitor(page, ORIGIN);
@@ -66,12 +72,12 @@ test.describe('client-side PlantUML rendering', () => {
 
     for (let index = 0; index < 3; index += 1) {
       await expect(figures.nth(index)).toHaveAttribute('data-plantuml-status', 'ready');
-      await expect(figures.nth(index).locator('svg')).toHaveCount(1);
+      await expect(figures.nth(index).locator(DIAGRAM_SVG)).toHaveCount(1);
     }
 
     // The class diagram exercises the bundled Graphviz engine rather than sequence layout.
     const classDiagram = figures.nth(1);
-    const classText = await classDiagram.locator('svg').textContent();
+    const classText = await classDiagram.locator(DIAGRAM_SVG).textContent();
     expect(classText).toContain('OrderService');
     expect(classText).toContain('OrderRepository');
     expect(classText).toContain('Clock');
@@ -90,8 +96,8 @@ test.describe('client-side PlantUML rendering', () => {
     await expect(figures).toHaveCount(2);
     await expect(figures.nth(0)).toHaveAttribute('data-plantuml-diagram', 'plantuml');
     await expect(figures.nth(1)).toHaveAttribute('data-plantuml-diagram', 'puml');
-    await expect(figures.nth(1).locator('svg')).toHaveCount(1);
-    expect(await figures.nth(1).locator('svg').textContent()).toContain('puml alias in MDX');
+    await expect(figures.nth(1).locator(DIAGRAM_SVG)).toHaveCount(1);
+    expect(await figures.nth(1).locator(DIAGRAM_SVG).textContent()).toContain('puml alias in MDX');
   });
 
   test('renders diagrams in blog posts', async ({page}) => {
@@ -118,11 +124,11 @@ test.describe('client-side PlantUML rendering', () => {
     // The failure is announced in text, not only by colour.
     await expect(broken.locator('details summary')).toHaveText('Show diagram source');
     await expect(broken.locator('details pre')).toContainText('this is definitely not valid');
-    await expect(broken.locator('svg')).toHaveCount(0);
+    await expect(broken.locator(DIAGRAM_SVG)).toHaveCount(0);
 
     // A failed render must not wedge the queue: the next diagram still renders.
     await expect(figures.nth(1)).toHaveAttribute('data-plantuml-status', 'ready');
-    await expect(figures.nth(1).locator('svg')).toHaveCount(1);
+    await expect(figures.nth(1).locator(DIAGRAM_SVG)).toHaveCount(1);
 
     expect(seen.pageErrors, 'a bad diagram must not crash the page').toEqual([]);
   });
@@ -163,7 +169,7 @@ test.describe('client-side PlantUML rendering', () => {
 
     const figure = page.locator(diagram).first();
     await expect(figure).toHaveAttribute('data-plantuml-theme', 'light');
-    const lightSvg = await figure.locator('svg').innerHTML();
+    const lightSvg = await figure.locator(DIAGRAM_SVG).innerHTML();
 
     await page.getByRole('button', {name: /switch between dark and light mode/i}).click();
 
@@ -171,14 +177,14 @@ test.describe('client-side PlantUML rendering', () => {
     await expect(figure).toHaveAttribute('data-plantuml-theme', 'dark');
     await expect(figure).toHaveAttribute('data-plantuml-status', 'ready');
 
-    const darkSvg = await figure.locator('svg').innerHTML();
+    const darkSvg = await figure.locator(DIAGRAM_SVG).innerHTML();
     expect(darkSvg, 'the dark diagram must not be the cached light one').not.toBe(lightSvg);
 
     // Switching back must restore the light diagram, not leave the dark one in place.
     await page.getByRole('button', {name: /switch between dark and light mode/i}).click();
     await expect(figure).toHaveAttribute('data-plantuml-theme', 'light');
     await expect(figure).toHaveAttribute('data-plantuml-status', 'ready');
-    expect(await figure.locator('svg').innerHTML()).toBe(lightSvg);
+    expect(await figure.locator(DIAGRAM_SVG).innerHTML()).toBe(lightSvg);
   });
 
   test('still renders after client-side navigation away and back', async ({page}) => {
@@ -197,7 +203,7 @@ test.describe('client-side PlantUML rendering', () => {
     await page.goForward();
     await waitForDiagrams(page, 1);
     await expect(page.locator(diagram).first()).toHaveAttribute('data-plantuml-status', 'ready');
-    await expect(page.locator(diagram).first().locator('svg')).toHaveCount(1);
+    await expect(page.locator(diagram).first().locator(DIAGRAM_SVG)).toHaveCount(1);
 
     // Client-side navigation must not append a second runtime script tag.
     await expect(page.locator('script[data-plantuml-runtime]')).toHaveCount(1);

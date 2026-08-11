@@ -9,6 +9,14 @@ import {renderGraphvizDiagram} from '../../runtime/graphvizRenderer.js';
 import {renderDiagram} from '../../runtime/renderer.js';
 import type {DiagramEngine, DiagramStatus} from '../../runtime/types.js';
 import {usePlantUmlConfig} from '../usePlantUmlConfig.js';
+import {
+  CloseIcon,
+  MaximizeIcon,
+  ResetZoomIcon,
+  SourceIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+} from './icons.js';
 import {useZoomPan} from './useZoomPan.js';
 import styles from './styles.module.css';
 
@@ -310,7 +318,7 @@ export default function PlantUmlDiagram({
       aria-controls={sourcePanelId}
       onClick={() => setSourceOpen((open) => !open)}
     >
-      <span aria-hidden="true">{'</>'}</span>
+      <SourceIcon />
     </button>
   );
 
@@ -445,7 +453,7 @@ export default function PlantUmlDiagram({
                 aria-label="Zoom out"
                 onClick={zoom.zoomOut}
               >
-                <span aria-hidden="true">−</span>
+                <ZoomOutIcon />
               </button>
             )}
             {!sourceOpen && (
@@ -455,7 +463,7 @@ export default function PlantUmlDiagram({
                 aria-label="Zoom in"
                 onClick={zoom.zoomIn}
               >
-                <span aria-hidden="true">+</span>
+                <ZoomInIcon />
               </button>
             )}
             {!sourceOpen && (
@@ -465,7 +473,7 @@ export default function PlantUmlDiagram({
                 aria-label="Reset zoom"
                 onClick={zoom.reset}
               >
-                <span aria-hidden="true">⟲</span>
+                <ResetZoomIcon />
               </button>
             )}
             <button
@@ -475,7 +483,7 @@ export default function PlantUmlDiagram({
               aria-pressed={zoom.maximized}
               onClick={zoom.toggleMaximize}
             >
-              <span aria-hidden="true">{zoom.maximized ? '✕' : '⛶'}</span>
+              {zoom.maximized ? <CloseIcon /> : <MaximizeIcon />}
             </button>
             {sourceToggle}
             {copyControl}
