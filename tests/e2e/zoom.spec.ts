@@ -429,16 +429,17 @@ test.describe('zoom and pan', () => {
     await expect.poll(() => zoomLevel(page)).toBeGreaterThan(2);
 
     // Button zoom anchors top-left, so the view sits at the top-left; pressing near the
-    // bottom-right of the map must pan the layer up and left.
+    // bottom-right of the map must pan the layer up and left. `click` with a position
+    // rather than raw mouse coordinates: the map lives at the bottom of the stage, which
+    // can be below the fold, and a raw mouse press outside the window lands on nothing.
     const canvas = map.locator('div[aria-hidden="true"]').first();
+    await canvas.scrollIntoViewIfNeeded();
     const box = await canvas.boundingBox();
     if (!box) throw new Error('minimap canvas has no box');
     const layer = layerOf(figure);
     const before = await rectOf(layer);
 
-    await page.mouse.move(box.x + box.width - 4, box.y + box.height - 4);
-    await page.mouse.down();
-    await page.mouse.up();
+    await canvas.click({position: {x: box.width - 6, y: box.height - 6}});
 
     await expect.poll(async () => (await rectOf(layer)).x).toBeLessThan(before.x);
 
