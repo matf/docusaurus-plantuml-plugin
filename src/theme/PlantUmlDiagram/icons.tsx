@@ -93,6 +93,34 @@ export function CloseIcon(): ReactElement {
   );
 }
 
+/** The search toggle: a lens. */
+export function SearchIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <circle cx="7" cy="7" r="4" />
+      <path d="M10 10l4 4" />
+    </svg>
+  );
+}
+
+/** Previous search match. */
+export function ChevronUpIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <path d="M4 10l4-4 4 4" />
+    </svg>
+  );
+}
+
+/** Next search match. */
+export function ChevronDownIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <path d="M4 6l4 4 4-4" />
+    </svg>
+  );
+}
+
 /** The minimap toggle: a map frame with the viewport rectangle marked inside it. */
 export function MinimapIcon(): ReactElement {
   return (

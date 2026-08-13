@@ -50,16 +50,17 @@ test.describe('zoom and pan', () => {
     await expect(wide.locator('div[role="img"] > svg')).toHaveCount(1);
     const group = wide.getByRole('group', {name: /zoom controls/});
     await expect(group).toBeVisible();
-    // Zoom out, zoom in, reset, fit, maximize, and the source toggle.
-    await expect(group.getByRole('button')).toHaveCount(6);
+    // Search, zoom out, zoom in, reset, fit, maximize, and the source toggle.
+    await expect(group.getByRole('button')).toHaveCount(7);
     await expect(group.getByRole('button', {name: 'Maximize diagram'})).toBeVisible();
     await expect(group.getByRole('button', {name: 'Show diagram source'})).toBeVisible();
 
     // Every control is drawn, not typed. `⛶` U+26F6 had no glyph on a stock Linux desktop,
     // so the maximize button used to render as a tofu box for a whole platform's readers.
     // See issue #21. Asserted against the real build because this is a rendering bug.
-    await expect(group.locator('button > svg')).toHaveCount(6);
+    await expect(group.locator('button > svg')).toHaveCount(7);
     for (const name of [
+      'Search diagram',
       'Zoom out',
       'Zoom in',
       'Reset zoom',
@@ -372,6 +373,41 @@ test.describe('zoom and pan', () => {
     expect(Math.abs(after.y - before.y), 'top edge must not move').toBeLessThanOrEqual(1);
 
     await page.keyboard.press('Escape');
+  });
+
+  test('search highlights matches and steps through them', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+
+    // Search whatever the first label actually says, so the test needs no fixture change.
+    const needle = (await figure.locator('svg text').first().textContent()) ?? '';
+    expect(needle.trim()).not.toBe('');
+
+    await figure.getByRole('button', {name: 'Search diagram'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-search-open', 'true');
+
+    const input = figure.getByRole('textbox', {name: 'Search diagram text'});
+    await expect(input).toBeFocused();
+    await input.fill(needle.trim());
+
+    const matches = figure.locator('[data-plantuml-search-match]');
+    await expect(matches.first()).toBeVisible();
+    const total = await matches.count();
+    await expect(figure.locator('[data-plantuml-search-current]')).toHaveCount(1);
+    await expect(figure.getByRole('status')).toHaveText(`1/${total}`);
+
+    // Enter steps; the current marker stays unique.
+    await input.press('Enter');
+    await expect(figure.locator('[data-plantuml-search-current]')).toHaveCount(1);
+    await expect(figure.getByRole('status')).toHaveText(`${total > 1 ? 2 : 1}/${total}`);
+
+    // Escape closes the bar and sweeps every highlight out of the SVG.
+    await input.press('Escape');
+    await expect(figure).not.toHaveAttribute('data-plantuml-search-open', 'true');
+    await expect(figure.locator('[data-plantuml-search-match]')).toHaveCount(0);
+    await expect(figure.locator('[data-plantuml-search-current]')).toHaveCount(0);
   });
 
   test('the minimap pans the diagram and closes from its own button', async ({page}) => {

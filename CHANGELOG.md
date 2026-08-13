@@ -29,6 +29,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   noise without adding a capability. Its close button stays outside the hidden subtree and
   remains focusable.
 
+- **Search within a diagram.** The new lens button opens a search bar beside the toolbar: a
+  case-insensitive substring search over the rendered SVG's text. Every match is marked with
+  `data-plantuml-search-match` and highlighted from the stylesheet — the cached SVG string is
+  never mutated — and the current match additionally carries `data-plantuml-search-current`.
+  Enter and the chevron buttons step through the matches (Shift+Enter backwards), each step
+  centres the view on its match at the current zoom level, and Escape or ✕ closes the bar
+  and sweeps every highlight. The figure carries `data-plantuml-search-open="true"` while
+  the bar is up.
+
+### Fixed
+
+- **The rendered SVG is no longer re-parsed on every re-render under React 19.** React 19
+  compares `dangerouslySetInnerHTML` by the wrapper object's identity rather than by its
+  `__html` string, so the inline `{{__html: svg}}` literal made every state change — opening
+  the source view, maximizing, a copy confirmation — throw away and re-parse the entire SVG
+  subtree. The wrapper is now memoized per SVG string. This is also what makes the search's
+  in-DOM highlights survive unrelated re-renders.
+
 ## [1.3.1]
 
 ### Fixed

@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, type ReactNode} from 'react';
+import {useCallback, useEffect, useMemo, useRef, type ReactNode} from 'react';
 
 import {CloseIcon} from './icons.js';
 import type {ZoomPanHandle} from './useZoomPan.js';
@@ -31,6 +31,9 @@ export interface MinimapProps {
 }
 
 export default function Minimap({svg, zoom, onClose}: MinimapProps): ReactNode {
+  // React 19 compares `dangerouslySetInnerHTML` by wrapper identity, not by `__html`; an
+  // inline literal would re-parse the copy on every re-render of the figure.
+  const svgHtml = useMemo(() => ({__html: svg}), [svg]);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const layerRef = useRef<HTMLDivElement | null>(null);
   const rectRef = useRef<HTMLDivElement | null>(null);
@@ -164,7 +167,7 @@ export default function Minimap({svg, zoom, onClose}: MinimapProps): ReactNode {
           ref={layerRef}
           className={styles.minimapLayer}
           // The same sanitized string the visible canvas renders — nothing new to sanitize.
-          dangerouslySetInnerHTML={{__html: svg}}
+          dangerouslySetInnerHTML={svgHtml}
         />
         <div ref={rectRef} className={styles.minimapRect} />
       </div>

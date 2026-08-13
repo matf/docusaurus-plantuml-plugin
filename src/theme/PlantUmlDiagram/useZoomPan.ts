@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -429,23 +430,41 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     if (!enabled) setMaximized(false);
   }, [enabled]);
 
-  return {
-    stageRef,
-    viewportRef,
-    layerRef,
-    readoutRef,
-    zoomIn,
-    zoomOut,
-    reset,
-    fit,
-    toggleMaximize,
-    onKeyDown,
-    maximized,
-    getTransform,
-    applyTransform: apply,
-    measure,
-    subscribe,
-  };
+  // One stable object per set of values: consumers hang effects off the handle (the search
+  // hook, the minimap), and an object recreated every render would re-run all of them — with
+  // visible consequences, such as a search that resets to its first match on any re-render.
+  return useMemo(
+    () => ({
+      stageRef,
+      viewportRef,
+      layerRef,
+      readoutRef,
+      zoomIn,
+      zoomOut,
+      reset,
+      fit,
+      toggleMaximize,
+      onKeyDown,
+      maximized,
+      getTransform,
+      applyTransform: apply,
+      measure,
+      subscribe,
+    }),
+    [
+      zoomIn,
+      zoomOut,
+      reset,
+      fit,
+      toggleMaximize,
+      onKeyDown,
+      maximized,
+      getTransform,
+      apply,
+      measure,
+      subscribe,
+    ],
+  );
 }
 
 export {MAX_SCALE, MIN_SCALE};

@@ -50,4 +50,10 @@ export const DATA_ATTR = {
   sourceOpen: 'data-plantuml-source-open',
   /** `"true"` on the figure while the minimap is open. */
   minimapOpen: 'data-plantuml-minimap-open',
+  /** `"true"` on the figure while the search bar is open. */
+  searchOpen: 'data-plantuml-search-open',
+  /** On every `<text>` element in the rendered SVG that matches the search query. */
+  searchMatch: 'data-plantuml-search-match',
+  /** On the one match the search is currently focused on; always also a `searchMatch`. */
+  searchCurrent: 'data-plantuml-search-current',
 } as const;

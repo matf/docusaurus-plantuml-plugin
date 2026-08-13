@@ -570,6 +570,19 @@ space instead and keeps it visible as long as possible.
 Scale is limited to 0.25×–8×, and the view resets to 100% whenever the diagram source or the
 site colour mode changes.
 
+### Search
+
+The lens button opens a search bar beside the toolbar. Matching is a case-insensitive
+substring search over the rendered SVG's text, so what you see is what you are searching.
+Every match is highlighted, the current one distinctly; the counter shows where you are;
+<kbd>Enter</kbd> / the chevrons step through the matches, <kbd>Shift</kbd>+<kbd>Enter</kbd>
+steps backwards, and each step pans the view so the match is centred — at whatever zoom
+level you are on. <kbd>Escape</kbd> or ✕ closes the bar and removes every highlight.
+
+Matches are marked with `data-plantuml-search-match` (and the current one additionally with
+`data-plantuml-search-current`) and coloured from the stylesheet, so site CSS can restyle the
+highlight without touching the plugin.
+
 ### Minimap
 
 The button in the bottom-left corner opens a minimap: a small copy of the diagram with a

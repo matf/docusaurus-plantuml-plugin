@@ -91,10 +91,20 @@
   transition: none;
 }
 
-.toolbar {
+/*
+ * One flex row holds the search bar and the toolbar, so opening the search never needs to
+ * know how wide the toolbar happens to be — it simply takes the space to its left.
+ */
+.controls {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.toolbar {
   display: flex;
   gap: 0.25rem;
   align-items: center;
@@ -103,6 +113,60 @@
   border-radius: var(--ifm-global-radius);
   background: var(--ifm-background-surface-color);
   opacity: 0.92;
+}
+
+.searchBar {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.25rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-background-surface-color);
+  opacity: 0.92;
+}
+
+.searchInput {
+  width: 10rem;
+  max-width: 40vw;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  /* Not `--ifm-background-color`: Infima defines it as `#0000` in light mode. */
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+  font-size: 0.8125rem;
+}
+
+.searchInput:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 1px;
+}
+
+.searchCount {
+  min-width: 2.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/*
+ * Search highlights, keyed on the attributes the search hook sets. Attribute + CSS rather
+ * than mutating the SVG string: the string is shared through the render cache, and a
+ * highlight must never leak into another figure showing the same diagram.
+ *
+ * These rules sit after the Graphviz `currentColor` retargeting above and tie on
+ * specificity, so source order is what makes the highlight win there too.
+ */
+.layer .canvas svg text[data-plantuml-search-match] {
+  fill: var(--ifm-color-primary);
+}
+
+.layer .canvas svg text[data-plantuml-search-current] {
+  fill: var(--ifm-color-danger-dark);
+  text-decoration: underline;
 }
 
 .toolbarButton {
@@ -253,6 +317,7 @@
 
 @media (forced-colors: active) {
   .toolbar,
+  .searchBar,
   .minimapBar,
   .minimap {
     border-color: ButtonBorder;
