@@ -45,8 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   focuses a node: every diagram on the page reacts - none needs an id of its own, and a
   diagram without the node does nothing - the page scrolls to the first matching figure, the
   node is marked with `data-plantuml-focused-node` and highlighted from the stylesheet, and
-  a zoomable diagram snaps to 100% centred on it. The hash is watched live (`hashchange`),
-  and a `#graph?…` hash defeats lazy loading so below-the-fold targets still react.
+  a zoomable diagram snaps to 100% centred on it. The hash is watched through the router, so
+  every kind of navigation reacts — pushed, replaced, popped and native `#…` clicks alike,
+  including a `<Link>` navigation that *drops* the hash, which sweeps the highlight — and a
+  `#graph?…` hash defeats lazy loading so below-the-fold targets still react.
 
   The identifier resolves through a ladder - explicit SVG `id` (Graphviz `node [id="…"]`),
   the PlantUML alias (`component "X" as REACTION_1234`, aliased notes included, via the

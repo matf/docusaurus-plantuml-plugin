@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import {useLocation} from '@docusaurus/router';
 import {useColorMode} from '@docusaurus/theme-common';
 
 import {DATA_ATTR} from '../../constants.js';
@@ -124,6 +125,9 @@ export default function PlantUmlDiagram({
 }: PlantUmlDiagramProps): ReactNode {
   const config = usePlantUmlConfig();
   const {colorMode} = useColorMode();
+  // The router, not `window.location`: `<Link>` navigations are `history.pushState` calls
+  // that fire no DOM event, so only the router sees every way the hash can change.
+  const routerLocation = useLocation();
   const containerRef = useRef<HTMLElement | null>(null);
   const hintId = useId();
   const sourcePanelId = useId();
@@ -149,12 +153,10 @@ export default function PlantUmlDiagram({
 
   const [state, setState] = useState<RenderState>(INITIAL_STATE);
   // A diagram deep link must be able to reach a diagram below the fold, so a `#graph?…`
-  // hash defeats lazy rendering. The initializer never runs during SSR (window is
-  // undefined there), and the first paint is the placeholder either way, so hydration
-  // cannot mismatch.
+  // hash defeats lazy rendering. The router's server-side location has no hash, and the
+  // first paint is the placeholder either way, so hydration cannot mismatch.
   const [inView, setInView] = useState(
-    () =>
-      !lazy || (typeof window !== 'undefined' && parseDiagramHash(window.location.hash) !== null),
+    () => !lazy || parseDiagramHash(routerLocation.hash) !== null,
   );
   const [sourceOpen, setSourceOpen] = useState(false);
   const [minimapOpen, setMinimapOpen] = useState(false);
@@ -218,15 +220,11 @@ export default function PlantUmlDiagram({
   });
 
   // A hash arriving *after* mount must defeat lazy rendering too — a deep link followed
-  // from another diagram on the same page may point below the fold.
+  // from another diagram on the same page may point below the fold. Driven by the router
+  // location rather than `hashchange`, which `<Link>` navigations never fire.
   useEffect(() => {
-    if (inView) return undefined;
-    const onHashChange = () => {
-      if (parseDiagramHash(window.location.hash) !== null) setInView(true);
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, [inView]);
+    if (!inView && parseDiagramHash(routerLocation.hash) !== null) setInView(true);
+  }, [inView, routerLocation.hash]);
 
   const searchToggleRef = useRef<HTMLButtonElement | null>(null);
 

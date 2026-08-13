@@ -12,6 +12,10 @@ The PlantUML component below is addressed by its **alias** — `MESSAGE_MY_GREAT
 never appears in the picture, but the engine writes it into the SVG as
 `data-qualified-name`. The note is aliased and addressable the same way.
 
+[Focus the command handler](#graph?highlight-node=MESSAGE_MY_GREAT_COMMAND) to highlight a
+node, then [clear the highlight](./links.md) without leaving the page — the second link is a
+router navigation that drops the hash, which must sweep the highlight.
+
 ```plantuml title="Navigable components"
 @startuml
 component "Command handler" as MESSAGE_MY_GREAT_COMMAND

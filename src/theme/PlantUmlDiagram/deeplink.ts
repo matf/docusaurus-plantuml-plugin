@@ -143,19 +143,23 @@ export function findDeeplinkTarget(root: Element, target: string): DeeplinkMatch
 }
 
 /**
- * Scrolls the page to the first figure that claims a given deeplink — and only that one.
+ * Scrolls the page to the first figure that claims a given deeplink navigation — and only
+ * that one.
  *
  * Diagrams evaluate the hash independently, so without an arbiter every matching figure
- * would fight over the scroll position. The first claim per (page, hash) wins; on a page
- * whose diagrams were force-rendered by the hash, renders complete in mount order, so the
- * first claimant is in practice the first matching figure in the document.
+ * would fight over the scroll position. The caller keys the claim on one *navigation* to
+ * one target (history entry key + pathname + target): the many diagrams reacting to a
+ * single navigation yield a single scroll, while following the same deep link again — a new
+ * history entry, unchanged hash — scrolls again. Keying on the target alone got that second
+ * follow wrong: the stale claim swallowed the scroll. On a page whose diagrams were
+ * force-rendered by the hash, renders complete in mount order, so the first claimant is in
+ * practice the first matching figure in the document.
  */
 let scrolledKey: string | null = null;
 
-export function claimDeeplinkScroll(target: string, figure: Element): void {
-  const key = typeof window === 'undefined' ? target : `${window.location.pathname}#${target}`;
-  if (scrolledKey === key) return;
-  scrolledKey = key;
+export function claimDeeplinkScroll(claimKey: string, figure: Element): void {
+  if (scrolledKey === claimKey) return;
+  scrolledKey = claimKey;
   figure.scrollIntoView({block: 'center'});
 }
 

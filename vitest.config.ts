@@ -37,6 +37,7 @@ export default defineConfig({
         find: /^@docusaurus\/theme-common$/,
         replacement: resolveLocal('./tests/stubs/themeCommon.ts'),
       },
+      {find: /^@docusaurus\/router$/, replacement: resolveLocal('./tests/stubs/router.ts')},
       {find: /^@docusaurus\/useBaseUrl$/, replacement: resolveLocal('./tests/stubs/useBaseUrl.ts')},
       {
         find: /^@docusaurus\/useGlobalData$/,

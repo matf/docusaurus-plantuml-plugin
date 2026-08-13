@@ -3,6 +3,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import PlantUmlDiagram from '../../src/theme/PlantUmlDiagram/index.js';
 import {resetDeeplinkScroll} from '../../src/theme/PlantUmlDiagram/deeplink.js';
+import {setStubLocation} from '../stubs/router.js';
 import {setStubOptions} from '../stubs/state.js';
 
 const {renderDiagramMock} = vi.hoisted(() => ({renderDiagramMock: vi.fn()}));
@@ -70,14 +71,13 @@ async function renderReady(props: Parameters<typeof PlantUmlDiagram>[0] = {sourc
   return result;
 }
 
-function setHash(hash: string): void {
-  window.location.hash = hash;
-}
-
-function fireHashChange(hash: string): void {
-  setHash(hash);
+/**
+ * Drives a router navigation, the way a Docusaurus `<Link>` does: `history.pushState`
+ * re-renders `useLocation` subscribers and fires no DOM event whatsoever.
+ */
+function navigate(hash: string): void {
   act(() => {
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    setStubLocation({hash});
   });
 }
 
@@ -93,17 +93,15 @@ beforeEach(() => {
   Element.prototype.setPointerCapture = vi.fn();
   Element.prototype.releasePointerCapture = vi.fn();
   Element.prototype.hasPointerCapture = vi.fn(() => false);
-  setHash('');
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  setHash('');
 });
 
 describe('arriving with a diagram hash', () => {
   it('marks the self-anchored node, scrolls to the figure and snaps to 100%', async () => {
-    setHash('#graph?highlight-node=REACTION-1234');
+    setStubLocation({hash: '#graph?highlight-node=REACTION-1234'});
     await renderReady();
 
     await waitFor(() => expect(focused()).toHaveLength(1));
@@ -113,7 +111,7 @@ describe('arriving with a diagram hash', () => {
   });
 
   it('matches loose text when no id or anchor claims the target', async () => {
-    setHash('#graph?highlight-node=12345');
+    setStubLocation({hash: '#graph?highlight-node=12345'});
     await renderReady();
 
     await waitFor(() => expect(focused()).toHaveLength(1));
@@ -121,7 +119,7 @@ describe('arriving with a diagram hash', () => {
   });
 
   it('does nothing on a diagram without the node', async () => {
-    setHash('#graph?highlight-node=NO-SUCH-NODE');
+    setStubLocation({hash: '#graph?highlight-node=NO-SUCH-NODE'});
     await renderReady();
 
     expect(focused()).toHaveLength(0);
@@ -129,7 +127,7 @@ describe('arriving with a diagram hash', () => {
   });
 
   it('defeats lazy rendering, so a below-the-fold target still reacts', async () => {
-    setHash('#graph?highlight-node=REACTION-1234');
+    setStubLocation({hash: '#graph?highlight-node=REACTION-1234'});
     render(<PlantUmlDiagram source={SOURCE} />);
 
     // Deliberately no IntersectionObserver trigger: the hash alone must start the render.
@@ -139,7 +137,7 @@ describe('arriving with a diagram hash', () => {
 
   it('highlights and scrolls on a diagram that opted out of zoom, without panning', async () => {
     setStubOptions({zoom: false});
-    setHash('#graph?highlight-node=REACTION-1234');
+    setStubLocation({hash: '#graph?highlight-node=REACTION-1234'});
     await renderReady();
 
     await waitFor(() => expect(focused()).toHaveLength(1));
@@ -148,24 +146,36 @@ describe('arriving with a diagram hash', () => {
   });
 });
 
-describe('hash changes while on the page', () => {
-  it('moves the highlight when the hash names another node', async () => {
-    setHash('#graph?highlight-node=REACTION-1234');
+describe('router navigations while the diagram stays mounted', () => {
+  it('sweeps the highlight when a navigation drops the hash', async () => {
+    // The bug this pins: a Docusaurus <Link> to the same page without a hash is a
+    // pushState — no hashchange fires, yet the highlight must go.
+    setStubLocation({hash: '#graph?highlight-node=REACTION-1234'});
     await renderReady();
     await waitFor(() => expect(focused()).toHaveLength(1));
 
-    fireHashChange('#graph?highlight-node=12345');
+    navigate('');
+
+    await waitFor(() => expect(focused()).toHaveLength(0));
+  });
+
+  it('moves the highlight when a navigation names another node', async () => {
+    setStubLocation({hash: '#graph?highlight-node=REACTION-1234'});
+    await renderReady();
+    await waitFor(() => expect(focused()).toHaveLength(1));
+
+    navigate('#graph?highlight-node=12345');
 
     await waitFor(() => expect(focused()[0]?.textContent).toBe('12345'));
     expect(focused()).toHaveLength(1);
   });
 
-  it('sweeps the highlight when the hash is cleared', async () => {
-    setHash('#graph?highlight-node=REACTION-1234');
+  it('sweeps the highlight when a navigation lands on an ordinary anchor', async () => {
+    setStubLocation({hash: '#graph?highlight-node=REACTION-1234'});
     await renderReady();
     await waitFor(() => expect(focused()).toHaveLength(1));
 
-    fireHashChange('#unrelated-heading');
+    navigate('#unrelated-heading');
 
     await waitFor(() => expect(focused()).toHaveLength(0));
   });
@@ -174,8 +184,24 @@ describe('hash changes while on the page', () => {
     await renderReady();
     expect(focused()).toHaveLength(0);
 
-    fireHashChange('#graph?highlight-node=REACTION-1234');
+    navigate('#graph?highlight-node=REACTION-1234');
 
     await waitFor(() => expect(focused()).toHaveLength(1));
+  });
+
+  it('scrolls again when the same deep link is followed a second time', async () => {
+    // The scroll claim keys on the navigation, not the target: follow, clear, follow the
+    // same link again — the second follow is a new history entry and must scroll too.
+    setStubLocation({hash: '#graph?highlight-node=REACTION-1234'});
+    await renderReady();
+    await waitFor(() => expect(scrolls).toBe(1));
+
+    navigate('');
+    await waitFor(() => expect(focused()).toHaveLength(0));
+
+    navigate('#graph?highlight-node=REACTION-1234');
+
+    await waitFor(() => expect(focused()).toHaveLength(1));
+    expect(scrolls).toBe(2);
   });
 });

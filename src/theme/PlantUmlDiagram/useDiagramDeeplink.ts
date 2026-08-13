@@ -1,4 +1,6 @@
-import {useEffect, useState, type MutableRefObject} from 'react';
+import {useEffect, type MutableRefObject} from 'react';
+
+import {useLocation} from '@docusaurus/router';
 
 import {DATA_ATTR} from '../../constants.js';
 import {claimDeeplinkScroll, findDeeplinkTarget, parseDiagramHash} from './deeplink.js';
@@ -13,6 +15,13 @@ import {centerViewportOn} from './zoomMath.js';
  * zoomable — the view snaps to 100% centred on the node. A diagram without the node does
  * nothing, which is what lets every diagram on the page react without any of them carrying
  * an id.
+ *
+ * The hash comes from the router, not from a `hashchange` listener: Docusaurus `<Link>`
+ * navigations are `history.pushState` calls, which fire no `hashchange` — so a listener
+ * kept a stale hash whenever a link changed or dropped it while the page (and this
+ * component) stayed mounted, leaving the old node highlighted. `useLocation` re-renders on
+ * push, replace and pop alike, and native `#…` anchor clicks reach it too, via the
+ * `popstate` the browser fires for hash navigations.
  *
  * Highlighting is imperative for the same reason the search's is: the marked elements live
  * in a `dangerouslySetInnerHTML` subtree React cannot render into.
@@ -36,22 +45,21 @@ export function useDiagramDeeplink({
   zoom,
   containerRef,
 }: UseDiagramDeeplinkParams): void {
-  const [target, setTarget] = useState<string | null>(() =>
-    typeof window === 'undefined' ? null : parseDiagramHash(window.location.hash),
-  );
-
-  // A link *inside* one diagram can address a node in another, so the hash is live state,
-  // not something read once on mount.
-  useEffect(() => {
-    const onHashChange = () => setTarget(parseDiagramHash(window.location.hash));
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
+  const location = useLocation();
+  const target = parseDiagramHash(location.hash);
+  // One value per history entry. Undefined on entries the router did not create itself
+  // (native hash clicks, the initial load); those still differ in `target`, which the
+  // scroll claim includes.
+  const navigationKey = location.key ?? 'pop';
+  const pathname = location.pathname;
 
   /**
-   * Marks, scrolls and centres. The cleanup unmarks, so a changed hash, a cleared hash and
-   * an unmounting diagram all sweep up through the same code path; a replaced SVG re-runs
-   * the effect (via `svg`) against the new elements.
+   * Marks, scrolls and centres. The cleanup unmarks, so a changed hash, a navigation that
+   * drops the hash and an unmounting diagram all sweep up through the same code path; a
+   * replaced SVG re-runs the effect (via `svg`) against the new elements.
+   *
+   * `navigationKey` is a dependency on purpose: following the same deep link again is a new
+   * history entry with an unchanged `target`, and it should scroll and re-centre again.
    */
   useEffect(() => {
     if (!ready || target === null) return undefined;
@@ -66,7 +74,7 @@ export function useDiagramDeeplink({
       element.setAttribute(DATA_ATTR.focusedNode, 'true');
     }
 
-    claimDeeplinkScroll(target, figure);
+    claimDeeplinkScroll(`${navigationKey}|${pathname}|${target}`, figure);
 
     if (interactive) {
       const layer = zoom.layerRef.current;
@@ -93,5 +101,5 @@ export function useDiagramDeeplink({
         element.removeAttribute(DATA_ATTR.focusedNode);
       }
     };
-  }, [containerRef, interactive, ready, svg, target, zoom]);
+  }, [containerRef, interactive, navigationKey, pathname, ready, svg, target, zoom]);
 }

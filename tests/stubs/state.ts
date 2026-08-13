@@ -1,5 +1,6 @@
 import {DEFAULT_OPTIONS, type ResolvedPlantUmlOptions} from '../../src/options.js';
 import {PLUGIN_NAME} from '../../src/constants.js';
+import {resetStubRouter} from './router.js';
 
 /**
  * Mutable stand-in for the Docusaurus context that theme components read from.
@@ -39,6 +40,7 @@ export function resetStubs(): void {
   stubState.baseUrl = '/plantuml-test/';
   stubState.globalData = defaultGlobalData(DEFAULT_OPTIONS);
   stubState.isBrowser = true;
+  resetStubRouter();
 }
 
 /** Replaces the plugin options exposed through global data. */

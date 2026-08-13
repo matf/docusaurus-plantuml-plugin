@@ -101,6 +101,28 @@ test.describe('diagram links and deep links', () => {
     await expect(page.locator(FOCUSED)).toHaveText(/self link/);
   });
 
+  test('a router navigation that drops the hash sweeps the highlight', async ({page}) => {
+    await page.goto('docs/links');
+    await waitForDiagrams(page, 2);
+
+    // The in-page markdown link is a native hash navigation; the router must see it too.
+    await page.getByRole('link', {name: 'Focus the command handler'}).click();
+    await expect(page.locator(FOCUSED)).toHaveCount(1);
+
+    // The clear link is a Docusaurus <Link> to the same page: history.pushState, no
+    // hashchange event, and the diagrams stay mounted — the case a hashchange listener
+    // silently missed, leaving the node highlighted.
+    await page.getByRole('link', {name: 'clear the highlight'}).click();
+    await expect.poll(() => page.evaluate(() => window.location.hash)).toBe('');
+    await expect(page.locator(FOCUSED)).toHaveCount(0);
+
+    // Following the same deep link again is a new navigation and must work in full,
+    // scroll included.
+    await page.getByRole('link', {name: 'Focus the command handler'}).click();
+    await expect(page.locator(FOCUSED)).toHaveCount(1);
+    await expect(page.locator('[data-plantuml-diagram]').first()).toBeInViewport();
+  });
+
   test('a changed hash moves the highlight without a reload', async ({page}) => {
     await page.goto('docs/links#graph?highlight-node=MESSAGE_MY_GREAT_COMMAND');
     await waitForDiagrams(page, 2);
