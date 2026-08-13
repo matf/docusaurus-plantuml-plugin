@@ -82,6 +82,20 @@
 }
 
 .layer {
+  /*
+   * Shrinks to the rendered picture instead of stretching across the viewport. The zoom
+   * hook measures content through `offsetWidth`/`offsetHeight` — layout sizes, immune to
+   * both the transform and its transition — so this is what makes those measurements mean
+   * "the diagram" rather than "the full-width frame". Fitting (which fills the screen when
+   * maximized) and the minimap both read that measurement.
+   *
+   * `max-width` is load-bearing, not decoration: in intrinsic (`fit-content`) sizing the
+   * SVG's own `max-width: 100%` resolves against an indefinite width and is ignored, so
+   * without this cap a diagram wider than the column would blow the layer out to the SVG's
+   * intrinsic width and overflow the frame.
+   */
+  width: fit-content;
+  max-width: 100%;
   transform-origin: 0 0;
   transition: transform var(--plantuml-zoom-transition, 150ms) ease-out;
 }
@@ -91,10 +105,20 @@
   transition: none;
 }
 
-.toolbar {
+/*
+ * One flex row holds the search bar and the toolbar, so opening the search never needs to
+ * know how wide the toolbar happens to be — it simply takes the space to its left.
+ */
+.controls {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.toolbar {
   display: flex;
   gap: 0.25rem;
   align-items: center;
@@ -103,6 +127,77 @@
   border-radius: var(--ifm-global-radius);
   background: var(--ifm-background-surface-color);
   opacity: 0.92;
+}
+
+.searchBar {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.25rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-background-surface-color);
+  opacity: 0.92;
+}
+
+.searchInput {
+  width: 10rem;
+  max-width: 40vw;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  /* Not `--ifm-background-color`: Infima defines it as `#0000` in light mode. */
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+  font-size: 0.8125rem;
+}
+
+.searchInput:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 1px;
+}
+
+.searchCount {
+  min-width: 2.25rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/*
+ * Search highlights, keyed on the attributes the search hook sets. Attribute + CSS rather
+ * than mutating the SVG string: the string is shared through the render cache, and a
+ * highlight must never leak into another figure showing the same diagram.
+ *
+ * These rules sit after the Graphviz `currentColor` retargeting above and tie on
+ * specificity, so source order is what makes the highlight win there too.
+ */
+.layer .canvas svg text[data-plantuml-search-match] {
+  fill: var(--ifm-color-primary);
+}
+
+.layer .canvas svg text[data-plantuml-search-current] {
+  fill: var(--ifm-color-danger-dark);
+  text-decoration: underline;
+}
+
+/*
+ * The node a `#graph?highlight-node=…` deep link resolved to.
+ *
+ * The attribute may sit on a text line itself, or on the group/anchor wrapping a whole node
+ * (Graphviz `g.node`, a PlantUML self-anchor), so both spellings are styled. Scoped to
+ * `.figure` rather than `.layer`: a diagram that opted out of zoom still highlights, it
+ * just cannot pan.
+ *
+ * Placed after the Graphviz `currentColor` retargeting, whose specificity these tie —
+ * source order is what makes the highlight win there.
+ */
+.figure .canvas svg text[data-plantuml-focused-node],
+.figure .canvas svg [data-plantuml-focused-node] text {
+  fill: var(--ifm-color-danger-dark);
+  text-decoration: underline;
 }
 
 .toolbarButton {
@@ -169,6 +264,80 @@
   max-height: none;
 }
 
+/*
+ * Minimap.
+ *
+ * A small copy of the diagram, bottom-left where the toolbar is top-right, with a rectangle
+ * marking the visible part. The copy is laid out at the content's own width and scaled down
+ * as one block, so it keeps exactly the geometry of the real canvas and the rectangle's
+ * coordinates can be multiplied straight through.
+ */
+.minimapBar {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  display: flex;
+  padding: 0.25rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-background-surface-color);
+  opacity: 0.92;
+}
+
+.minimap {
+  position: absolute;
+  bottom: 3.25rem;
+  left: 0.5rem;
+  /*
+   * The close control sits *beside* the map, not floating over it: a wide, short diagram
+   * makes a map only a couple of buttons tall, and an overlaid control would cover — and
+   * steal presses from — the map's whole right end.
+   */
+  display: flex;
+  gap: 0.25rem;
+  align-items: flex-start;
+  max-width: calc(100% - 1rem);
+  padding: 0.25rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-background-surface-color);
+  opacity: 0.95;
+}
+
+.minimapCanvas {
+  position: relative;
+  max-width: 100%;
+  overflow: hidden;
+  cursor: crosshair;
+  /* The map pans the diagram; a drag on it must never scroll the page instead. */
+  touch-action: none;
+}
+
+.minimapLayer {
+  transform-origin: 0 0;
+  /* The map is one press-or-drag surface; its copy of the diagram must not eat the events. */
+  pointer-events: none;
+}
+
+.minimapLayer svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.minimapRect {
+  position: absolute;
+  border: 2px solid var(--ifm-color-primary);
+  background: color-mix(in srgb, var(--ifm-color-primary) 20%, transparent);
+  pointer-events: none;
+}
+
+.minimapClose {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;
@@ -182,13 +351,22 @@
 }
 
 @media (forced-colors: active) {
-  .toolbar {
+  .toolbar,
+  .searchBar,
+  .minimapBar,
+  .minimap {
     border-color: ButtonBorder;
   }
 
   .toolbarButton {
     border-color: ButtonBorder;
     color: ButtonText;
+  }
+
+  /* `color-mix` resolves to nothing useful here; the outline alone must carry the meaning. */
+  .minimapRect {
+    border-color: Highlight;
+    background: transparent;
   }
 }
 

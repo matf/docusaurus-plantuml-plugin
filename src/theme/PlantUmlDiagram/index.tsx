@@ -1,5 +1,15 @@
-import {useCallback, useEffect, useId, useRef, useState, type ReactNode} from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react';
 
+import {useLocation} from '@docusaurus/router';
 import {useColorMode} from '@docusaurus/theme-common';
 
 import {DATA_ATTR} from '../../constants.js';
@@ -10,13 +20,22 @@ import {renderDiagram} from '../../runtime/renderer.js';
 import type {DiagramEngine, DiagramStatus} from '../../runtime/types.js';
 import {usePlantUmlConfig} from '../usePlantUmlConfig.js';
 import {
+  ChevronDownIcon,
+  ChevronUpIcon,
   CloseIcon,
+  FitIcon,
   MaximizeIcon,
+  MinimapIcon,
   ResetZoomIcon,
+  SearchIcon,
   SourceIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from './icons.js';
+import {parseDiagramHash} from './deeplink.js';
+import Minimap from './Minimap.js';
+import {useDiagramDeeplink} from './useDiagramDeeplink.js';
+import {useDiagramSearch} from './useDiagramSearch.js';
 import {useZoomPan} from './useZoomPan.js';
 import styles from './styles.module.css';
 
@@ -106,6 +125,9 @@ export default function PlantUmlDiagram({
 }: PlantUmlDiagramProps): ReactNode {
   const config = usePlantUmlConfig();
   const {colorMode} = useColorMode();
+  // The router, not `window.location`: `<Link>` navigations are `history.pushState` calls
+  // that fire no DOM event, so only the router sees every way the hash can change.
+  const routerLocation = useLocation();
   const containerRef = useRef<HTMLElement | null>(null);
   const hintId = useId();
   const sourcePanelId = useId();
@@ -130,8 +152,14 @@ export default function PlantUmlDiagram({
   const sourceAvailable = showSourceProp ?? config?.options.showSource ?? true;
 
   const [state, setState] = useState<RenderState>(INITIAL_STATE);
-  const [inView, setInView] = useState(!lazy);
+  // A diagram deep link must be able to reach a diagram below the fold, so a `#graph?…`
+  // hash defeats lazy rendering. The router's server-side location has no hash, and the
+  // first paint is the placeholder either way, so hydration cannot mismatch.
+  const [inView, setInView] = useState(
+    () => !lazy || parseDiagramHash(routerLocation.hash) !== null,
+  );
   const [sourceOpen, setSourceOpen] = useState(false);
+  const [minimapOpen, setMinimapOpen] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -176,6 +204,53 @@ export default function PlantUmlDiagram({
     // gratuitous jump.
     resetKey: `${source}|${engine}|${resolvedLayout}|${renderDark ? 'dark' : 'light'}`,
   });
+
+  const search = useDiagramSearch({
+    enabled: interactive && state.status === 'ready',
+    zoom,
+    svg: state.svg,
+  });
+
+  useDiagramDeeplink({
+    ready: state.status === 'ready' && state.svg !== null,
+    svg: state.svg,
+    interactive,
+    zoom,
+    containerRef,
+  });
+
+  // A hash arriving *after* mount must defeat lazy rendering too — a deep link followed
+  // from another diagram on the same page may point below the fold. Driven by the router
+  // location rather than `hashchange`, which `<Link>` navigations never fire.
+  useEffect(() => {
+    if (!inView && parseDiagramHash(routerLocation.hash) !== null) setInView(true);
+  }, [inView, routerLocation.hash]);
+
+  const searchToggleRef = useRef<HTMLButtonElement | null>(null);
+
+  // Escape and the ✕ hand focus back to the toggle, so the keyboard is not left stranded on
+  // a control that just left the page.
+  const closeSearch = useCallback(() => {
+    search.close();
+    searchToggleRef.current?.focus();
+  }, [search]);
+
+  const onSearchKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        if (event.shiftKey) search.previous();
+        else search.next();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        // Escape in the search closes the search. Without this, the document-level listener
+        // would also un-maximize the diagram in the same keystroke.
+        event.stopPropagation();
+        closeSearch();
+      }
+    },
+    [closeSearch, search],
+  );
 
   useEffect(() => {
     if (!lazy || inView) return undefined;
@@ -284,9 +359,17 @@ export default function PlantUmlDiagram({
   const label = title ?? `${engineName} diagram`;
   const busy = state.status === 'loading' || state.status === 'rendering';
 
+  /**
+   * One wrapper object per SVG string, not a fresh literal in the JSX: React 19 compares
+   * `dangerouslySetInnerHTML` by the wrapper's identity, not by `__html`, so an inline
+   * literal makes every re-render of the figure re-parse the whole SVG subtree — visibly
+   * so once anything marks the rendered elements, as the search's highlights do.
+   */
+  const svgHtml = useMemo(() => (state.svg === null ? null : {__html: state.svg}), [state.svg]);
+
   // The sanitized SVG always lives in this element, zoomable or not, so `role="img" > svg`
   // stays a stable contract for tests and for author CSS.
-  const canvas = state.svg !== null && (
+  const canvas = state.svg !== null && svgHtml !== null && (
     <div
       className={
         !interactive && sourceOpen ? `${styles.canvas} ${styles.hiddenView}` : styles.canvas
@@ -294,7 +377,7 @@ export default function PlantUmlDiagram({
       role="img"
       aria-label={label}
       // Sanitized above unless `sanitizeSvg: false` was explicitly opted into.
-      dangerouslySetInnerHTML={{__html: state.svg}}
+      dangerouslySetInnerHTML={svgHtml}
     />
   );
 
@@ -368,6 +451,8 @@ export default function PlantUmlDiagram({
         ...(interactive ? {[DATA_ATTR.interactive]: 'true'} : {}),
         ...(zoom.maximized ? {[DATA_ATTR.maximized]: 'true'} : {}),
         ...(sourceOpen ? {[DATA_ATTR.sourceOpen]: 'true'} : {}),
+        ...(minimapOpen ? {[DATA_ATTR.minimapOpen]: 'true'} : {}),
+        ...(search.open ? {[DATA_ATTR.searchOpen]: 'true'} : {}),
       }}
     >
       {/*
@@ -437,65 +522,169 @@ export default function PlantUmlDiagram({
           </div>
 
           {/*
-           * `role="group"`, not `role="toolbar"`: a toolbar owes readers arrow-key navigation
-           * between its buttons, and the arrow keys already pan the diagram.
+           * One row for the search bar and the toolbar, so the bar opens beside the controls
+           * without either needing to know the other's width.
            */}
-          {/*
-           * The zoom controls are hidden while the source is shown: they would act on a picture
-           * nobody can see. Maximize stays — it is what sizes the frame the source is read in,
-           * and removing it while maximized would strand the reader with no way back but Escape.
-           */}
-          <div className={styles.toolbar} role="group" aria-label={`${label} zoom controls`}>
-            {!sourceOpen && (
+          <div className={styles.controls}>
+            {search.open && !sourceOpen && (
+              <div className={styles.searchBar} role="search" aria-label={`${label} search`}>
+                <input
+                  ref={search.inputRef}
+                  type="text"
+                  className={styles.searchInput}
+                  placeholder="Search diagram"
+                  aria-label="Search diagram text"
+                  value={search.query}
+                  onChange={(event) => search.setQuery(event.target.value)}
+                  onKeyDown={onSearchKeyDown}
+                />
+                {/*
+                 * `role="status"` so a reader hears where they landed after Enter, without a
+                 * live region that would announce every keystroke's recount as well — status
+                 * is polite, so it only speaks when the reader is idle.
+                 */}
+                <span className={styles.searchCount} role="status">
+                  {search.matchCount === 0
+                    ? '0/0'
+                    : `${search.currentIndex + 1}/${search.matchCount}`}
+                </span>
+                <button
+                  type="button"
+                  className={styles.toolbarButton}
+                  aria-label="Previous match"
+                  onClick={search.previous}
+                >
+                  <ChevronUpIcon />
+                </button>
+                <button
+                  type="button"
+                  className={styles.toolbarButton}
+                  aria-label="Next match"
+                  onClick={search.next}
+                >
+                  <ChevronDownIcon />
+                </button>
+                <button
+                  type="button"
+                  className={styles.toolbarButton}
+                  aria-label="Close search"
+                  onClick={closeSearch}
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            )}
+
+            {/*
+             * `role="group"`, not `role="toolbar"`: a toolbar owes readers arrow-key navigation
+             * between its buttons, and the arrow keys already pan the diagram.
+             */}
+            {/*
+             * The zoom controls are hidden while the source is shown: they would act on a picture
+             * nobody can see. Maximize stays — it is what sizes the frame the source is read in,
+             * and removing it while maximized would strand the reader with no way back but Escape.
+             */}
+            <div className={styles.toolbar} role="group" aria-label={`${label} zoom controls`}>
+              {!sourceOpen && (
+                <button
+                  ref={searchToggleRef}
+                  type="button"
+                  className={styles.toolbarButton}
+                  aria-label="Search diagram"
+                  aria-expanded={search.open}
+                  onClick={search.toggle}
+                >
+                  <SearchIcon />
+                </button>
+              )}
+              {!sourceOpen && (
+                <button
+                  type="button"
+                  className={styles.toolbarButton}
+                  aria-label="Zoom out"
+                  onClick={zoom.zoomOut}
+                >
+                  <ZoomOutIcon />
+                </button>
+              )}
+              {!sourceOpen && (
+                <button
+                  type="button"
+                  className={styles.toolbarButton}
+                  aria-label="Zoom in"
+                  onClick={zoom.zoomIn}
+                >
+                  <ZoomInIcon />
+                </button>
+              )}
+              {!sourceOpen && (
+                <button
+                  type="button"
+                  className={styles.toolbarButton}
+                  aria-label="Reset zoom"
+                  onClick={zoom.reset}
+                >
+                  <ResetZoomIcon />
+                </button>
+              )}
+              {/*
+               * Fit exists only while maximized: there it fills the screen with the diagram,
+               * while inline the frame already grows with the picture, so a fit would land
+               * on 100% and duplicate Reset.
+               */}
+              {!sourceOpen && zoom.maximized && (
+                <button
+                  type="button"
+                  className={styles.toolbarButton}
+                  aria-label="Fit diagram to screen"
+                  onClick={zoom.fit}
+                >
+                  <FitIcon />
+                </button>
+              )}
               <button
                 type="button"
                 className={styles.toolbarButton}
-                aria-label="Zoom out"
-                onClick={zoom.zoomOut}
+                aria-label="Maximize diagram"
+                aria-pressed={zoom.maximized}
+                onClick={zoom.toggleMaximize}
               >
-                <ZoomOutIcon />
+                {zoom.maximized ? <CloseIcon /> : <MaximizeIcon />}
               </button>
-            )}
-            {!sourceOpen && (
-              <button
-                type="button"
-                className={styles.toolbarButton}
-                aria-label="Zoom in"
-                onClick={zoom.zoomIn}
+              {sourceToggle}
+              {copyControl}
+              {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
+              <span
+                ref={zoom.readoutRef}
+                className={sourceOpen ? `${styles.readout} ${styles.hiddenView}` : styles.readout}
+                aria-hidden="true"
               >
-                <ZoomInIcon />
-              </button>
-            )}
-            {!sourceOpen && (
-              <button
-                type="button"
-                className={styles.toolbarButton}
-                aria-label="Reset zoom"
-                onClick={zoom.reset}
-              >
-                <ResetZoomIcon />
-              </button>
-            )}
-            <button
-              type="button"
-              className={styles.toolbarButton}
-              aria-label="Maximize diagram"
-              aria-pressed={zoom.maximized}
-              onClick={zoom.toggleMaximize}
-            >
-              {zoom.maximized ? <CloseIcon /> : <MaximizeIcon />}
-            </button>
-            {sourceToggle}
-            {copyControl}
-            {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
-            <span
-              ref={zoom.readoutRef}
-              className={sourceOpen ? `${styles.readout} ${styles.hiddenView}` : styles.readout}
-              aria-hidden="true"
-            >
-              100%
-            </span>
+                100%
+              </span>
+            </div>
           </div>
+
+          {/*
+           * Bottom-left, mirroring the toolbar's top-right: the minimap toggle, with the map
+           * itself above it while open. Both disappear with the picture when the source view
+           * is flipped on — a map of an invisible diagram would pan nothing anyone can see.
+           */}
+          {!sourceOpen && minimapOpen && (
+            <Minimap svg={state.svg} zoom={zoom} onClose={() => setMinimapOpen(false)} />
+          )}
+          {!sourceOpen && (
+            <div className={styles.minimapBar}>
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label={minimapOpen ? 'Hide minimap' : 'Show minimap'}
+                aria-expanded={minimapOpen}
+                onClick={() => setMinimapOpen((open) => !open)}
+              >
+                <MinimapIcon />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -49,10 +50,26 @@ export interface ZoomPanHandle {
   zoomIn: () => void;
   zoomOut: () => void;
   reset: () => void;
+  /** Fits the whole diagram inside the viewport, at whatever scale that takes to fill it. */
+  fit: () => void;
   toggleMaximize: () => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   /** Whether the diagram currently fills the browser viewport. */
   maximized: boolean;
+  /** Reads the live transform without subscribing to it. */
+  getTransform: () => Transform;
+  /** Applies a transform through the same clamp as every gesture. */
+  applyTransform: (next: Transform) => void;
+  /** Layout sizes of the viewport and content — the bounds the clamp runs against. */
+  measure: () => Bounds;
+  /**
+   * Calls the listener after every committed transform write; returns the unsubscribe.
+   *
+   * This is how the minimap tracks the view: the transform is written straight to the DOM on
+   * every pan frame, so anything that mirrored it through React state would re-render the
+   * component once per frame.
+   */
+  subscribe: (listener: (transform: Transform) => void) => () => void;
 }
 
 export interface UseZoomPanParams {
@@ -72,13 +89,18 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
 
   const [maximized, setMaximized] = useState(false);
   const transformRef = useRef<Transform>(IDENTITY);
+  const listenersRef = useRef<Set<(transform: Transform) => void>>(new Set());
   /** The view to restore when the diagram is un-maximized. */
   const beforeMaximizeRef = useRef<Transform | null>(null);
   const frameRef = useRef<number | null>(null);
 
   /**
    * Layout sizes, never `getBoundingClientRect()`: the layer's rect includes the transform we
-   * are about to change, which would feed back into the next measurement.
+   * are about to change — and, mid-easing, the transition — which would feed back into the
+   * next measurement. The layer is `width: fit-content`, so its layout size *is* the rendered
+   * picture's, not the full-width frame's; that is what lets fitting fill a maximized screen
+   * and keeps the minimap honest about where the diagram ends. The clamp deliberately runs
+   * against wider bounds — see {@link clampBounds}.
    */
   const measure = useCallback((): Bounds => {
     const viewport = viewportRef.current;
@@ -91,6 +113,21 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     };
   }, []);
 
+  /**
+   * The bounds the clamp runs against: the picture or the viewport, whichever is *wider*.
+   *
+   * Fitting wants the true picture size; the clamp deliberately does not. Focal zoom must
+   * hold the point under the pointer even when that slides the picture's right edge inside
+   * the viewport — clamping to the picture itself yanks the diagram sideways mid-gesture the
+   * moment that edge is reached. Flooring the width at the viewport's restores exactly the
+   * geometry the full-width layer always gave. Height is not floored: the layer never
+   * stretched vertically, so the height clamp has always run against the real picture.
+   */
+  const clampBounds = useCallback((): Bounds => {
+    const bounds = measure();
+    return {...bounds, contentWidth: Math.max(bounds.contentWidth, bounds.viewportWidth)};
+  }, [measure]);
+
   const write = useCallback((next: Transform) => {
     transformRef.current = next;
     const layer = layerRef.current;
@@ -99,13 +136,23 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     if (viewport) viewport.dataset['plantumlZoom'] = formatZoom(next.k);
     const readout = readoutRef.current;
     if (readout) readout.textContent = formatPercent(next.k);
+    for (const listener of listenersRef.current) listener(next);
   }, []);
+
+  const subscribe = useCallback((listener: (transform: Transform) => void) => {
+    listenersRef.current.add(listener);
+    return () => {
+      listenersRef.current.delete(listener);
+    };
+  }, []);
+
+  const getTransform = useCallback(() => transformRef.current, []);
 
   const apply = useCallback(
     (next: Transform) => {
-      write(clampTransform(next, measure()));
+      write(clampTransform(next, clampBounds()));
     },
-    [measure, write],
+    [clampBounds, write],
   );
 
   const reset = useCallback(() => {
@@ -132,6 +179,19 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
 
   const zoomIn = useCallback(() => zoomByStep(SCALE_STEP), [zoomByStep]);
   const zoomOut = useCallback(() => zoomByStep(1 / SCALE_STEP), [zoomByStep]);
+
+  /**
+   * The fitted view maximizing opens with: the diagram scaled to fill the screen, magnified
+   * or shrunk as the picture demands, capped at {@link MAX_SCALE}.
+   *
+   * Only offered while maximized. Inline it would duplicate Reset, because the inline frame
+   * grows with the diagram — at 100% everything is already visible, so there is nothing for
+   * a fit to add. Translation returns to the origin because a diagram that fits is
+   * left-aligned, exactly as `clampTransform` would force anyway.
+   */
+  const fit = useCallback(() => {
+    apply({...IDENTITY, k: fitScale(measure())});
+  }, [apply, measure]);
 
   const toggleMaximize = useCallback(() => {
     setMaximized((previous) => !previous);
@@ -390,18 +450,41 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     if (!enabled) setMaximized(false);
   }, [enabled]);
 
-  return {
-    stageRef,
-    viewportRef,
-    layerRef,
-    readoutRef,
-    zoomIn,
-    zoomOut,
-    reset,
-    toggleMaximize,
-    onKeyDown,
-    maximized,
-  };
+  // One stable object per set of values: consumers hang effects off the handle (the search
+  // hook, the minimap), and an object recreated every render would re-run all of them — with
+  // visible consequences, such as a search that resets to its first match on any re-render.
+  return useMemo(
+    () => ({
+      stageRef,
+      viewportRef,
+      layerRef,
+      readoutRef,
+      zoomIn,
+      zoomOut,
+      reset,
+      fit,
+      toggleMaximize,
+      onKeyDown,
+      maximized,
+      getTransform,
+      applyTransform: apply,
+      measure,
+      subscribe,
+    }),
+    [
+      zoomIn,
+      zoomOut,
+      reset,
+      fit,
+      toggleMaximize,
+      onKeyDown,
+      maximized,
+      getTransform,
+      apply,
+      measure,
+      subscribe,
+    ],
+  );
 }
 
 export {MAX_SCALE, MIN_SCALE};

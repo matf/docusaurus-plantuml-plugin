@@ -62,6 +62,19 @@ export function ResetZoomIcon(): ReactElement {
   );
 }
 
+/**
+ * Fit to view: the maximize corners with the diagram drawn inside them, so the two controls
+ * read as siblings — both are about the frame, one keeps you in the page.
+ */
+export function FitIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" />
+      <rect x="5.5" y="5.5" width="5" height="5" rx="1" />
+    </svg>
+  );
+}
+
 /** Replaces `⛶` U+26F6, the character that had no glyph. */
 export function MaximizeIcon(): ReactElement {
   return (
@@ -76,6 +89,44 @@ export function CloseIcon(): ReactElement {
   return (
     <svg {...iconProps}>
       <path d="M4 4l8 8M12 4l-8 8" />
+    </svg>
+  );
+}
+
+/** The search toggle: a lens. */
+export function SearchIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <circle cx="7" cy="7" r="4" />
+      <path d="M10 10l4 4" />
+    </svg>
+  );
+}
+
+/** Previous search match. */
+export function ChevronUpIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <path d="M4 10l4-4 4 4" />
+    </svg>
+  );
+}
+
+/** Next search match. */
+export function ChevronDownIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <path d="M4 6l4 4 4-4" />
+    </svg>
+  );
+}
+
+/** The minimap toggle: a map frame with the viewport rectangle marked inside it. */
+export function MinimapIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <rect x="2" y="3" width="12" height="10" rx="1" />
+      <rect x="4.5" y="7.5" width="4" height="3" fill="currentColor" stroke="none" />
     </svg>
   );
 }

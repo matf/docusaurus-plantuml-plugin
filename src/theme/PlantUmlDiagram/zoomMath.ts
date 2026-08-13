@@ -132,6 +132,62 @@ export function fitScale(bounds: Bounds, max = MAX_SCALE): number {
   return clamp(scale, MIN_SCALE, max);
 }
 
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Scale of the minimap image: the largest scale that fits the content into the given box,
+ * but never past 1 — a small diagram is shown at its own size, not blown up into a blurrier
+ * copy of itself sitting next to the original.
+ *
+ * Returns 0 when there is nothing to draw, which callers treat as "no minimap".
+ */
+export function minimapScale(bounds: Bounds, maxWidth: number, maxHeight: number): number {
+  if (bounds.contentWidth <= 0 || bounds.contentHeight <= 0) return 0;
+  const scale = Math.min(maxWidth / bounds.contentWidth, maxHeight / bounds.contentHeight, 1);
+  return Number.isFinite(scale) && scale > 0 ? scale : 0;
+}
+
+/**
+ * The part of the content the viewport currently shows, in content coordinates.
+ *
+ * Clamped to the content box, so the minimap's viewport rectangle can never poke outside the
+ * picture — not even mid-gesture, when the transform itself may be momentarily out of range.
+ */
+export function visibleContentRect(transform: Transform, bounds: Bounds): Rect {
+  const width = Math.min(bounds.viewportWidth / transform.k, bounds.contentWidth);
+  const height = Math.min(bounds.viewportHeight / transform.k, bounds.contentHeight);
+  return {
+    x: clamp(-transform.x / transform.k, 0, Math.max(0, bounds.contentWidth - width)),
+    y: clamp(-transform.y / transform.k, 0, Math.max(0, bounds.contentHeight - height)),
+    width,
+    height,
+  };
+}
+
+/**
+ * The transform that centres the viewport on a content point, at the current scale.
+ *
+ * Deliberately unclamped: callers apply it through the same clamp as every gesture, which
+ * pins edge cases exactly the way the end of a drag is pinned.
+ */
+export function centerViewportOn(
+  transform: Transform,
+  contentX: number,
+  contentY: number,
+  bounds: Bounds,
+): Transform {
+  return {
+    k: transform.k,
+    x: bounds.viewportWidth / 2 - contentX * transform.k,
+    y: bounds.viewportHeight / 2 - contentY * transform.k,
+  };
+}
+
 /** Rounds away floating-point noise so repeated zoom in/out returns to exactly 1. */
 function tidy(value: number): number {
   return Math.abs(value) < 1e-6 ? 0 : Math.round(value * 1e6) / 1e6;

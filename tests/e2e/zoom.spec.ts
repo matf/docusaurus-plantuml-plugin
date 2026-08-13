@@ -50,16 +50,24 @@ test.describe('zoom and pan', () => {
     await expect(wide.locator('div[role="img"] > svg')).toHaveCount(1);
     const group = wide.getByRole('group', {name: /zoom controls/});
     await expect(group).toBeVisible();
-    // Zoom out, zoom in, reset, maximize, and the source toggle.
-    await expect(group.getByRole('button')).toHaveCount(5);
+    // Search, zoom out, zoom in, reset, maximize, and the source toggle. Fit is absent
+    // here on purpose — it exists only in the maximized view, where it can fill a screen.
+    await expect(group.getByRole('button')).toHaveCount(6);
+    await expect(group.getByRole('button', {name: 'Fit diagram to screen'})).toHaveCount(0);
     await expect(group.getByRole('button', {name: 'Maximize diagram'})).toBeVisible();
     await expect(group.getByRole('button', {name: 'Show diagram source'})).toBeVisible();
 
     // Every control is drawn, not typed. `⛶` U+26F6 had no glyph on a stock Linux desktop,
     // so the maximize button used to render as a tofu box for a whole platform's readers.
     // See issue #21. Asserted against the real build because this is a rendering bug.
-    await expect(group.locator('button > svg')).toHaveCount(5);
-    for (const name of ['Zoom out', 'Zoom in', 'Reset zoom', 'Maximize diagram']) {
+    await expect(group.locator('button > svg')).toHaveCount(6);
+    for (const name of [
+      'Search diagram',
+      'Zoom out',
+      'Zoom in',
+      'Reset zoom',
+      'Maximize diagram',
+    ]) {
       const button = group.getByRole('button', {name});
       await expect(button.locator('svg')).toHaveCount(1);
       // Nothing left that a missing font could fail to draw.
@@ -128,6 +136,37 @@ test.describe('zoom and pan', () => {
     await expect
       .poll(async () => Math.abs((await rectOf(layerOf(figure))).width - before.width))
       .toBeLessThanOrEqual(1);
+  });
+
+  test('fit fills the maximized screen with the whole diagram', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    await figure.getByRole('button', {name: 'Maximize diagram'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-maximized', 'true');
+
+    // Wander off the fitted opening view, then Fit must find the way back.
+    const zoomIn = figure.getByRole('button', {name: 'Zoom in'});
+    for (let i = 0; i < 5; i += 1) await zoomIn.click();
+
+    await figure.getByRole('button', {name: 'Fit diagram to screen'}).click();
+
+    // Polled: discrete zoom steps ease over 150ms, so the geometry settles after the click.
+    // Fitted means contained — and *filling* the screen: at the fit scale one axis runs
+    // edge to edge, which is what separates this from a mere reset.
+    const viewport = page.locator(viewportSelector).first();
+    await expect
+      .poll(async () => {
+        const layer = await rectOf(layerOf(figure));
+        const box = await rectOf(viewport);
+        const contained = layer.width <= box.width + 1 && layer.height <= box.height + 1;
+        const fills = layer.width >= box.width - 2 || layer.height >= box.height - 2;
+        return contained && fills;
+      })
+      .toBe(true);
+
+    await page.keyboard.press('Escape');
   });
 
   test('a plain wheel scrolls the page instead of zooming', async ({page}) => {
@@ -344,6 +383,79 @@ test.describe('zoom and pan', () => {
     expect(Math.abs(after.y - before.y), 'top edge must not move').toBeLessThanOrEqual(1);
 
     await page.keyboard.press('Escape');
+  });
+
+  test('search highlights matches and steps through them', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+
+    // Search whatever the first label actually says, so the test needs no fixture change.
+    const needle = (await figure.locator('svg text').first().textContent()) ?? '';
+    expect(needle.trim()).not.toBe('');
+
+    await figure.getByRole('button', {name: 'Search diagram'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-search-open', 'true');
+
+    const input = figure.getByRole('textbox', {name: 'Search diagram text'});
+    await expect(input).toBeFocused();
+    await input.fill(needle.trim());
+
+    const matches = figure.locator('[data-plantuml-search-match]');
+    await expect(matches.first()).toBeVisible();
+    const total = await matches.count();
+    await expect(figure.locator('[data-plantuml-search-current]')).toHaveCount(1);
+    await expect(figure.getByRole('status')).toHaveText(`1/${total}`);
+
+    // Enter steps; the current marker stays unique.
+    await input.press('Enter');
+    await expect(figure.locator('[data-plantuml-search-current]')).toHaveCount(1);
+    await expect(figure.getByRole('status')).toHaveText(`${total > 1 ? 2 : 1}/${total}`);
+
+    // Escape closes the bar and sweeps every highlight out of the SVG.
+    await input.press('Escape');
+    await expect(figure).not.toHaveAttribute('data-plantuml-search-open', 'true');
+    await expect(figure.locator('[data-plantuml-search-match]')).toHaveCount(0);
+    await expect(figure.locator('[data-plantuml-search-current]')).toHaveCount(0);
+  });
+
+  test('the minimap pans the diagram and closes from its own button', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    await figure.getByRole('button', {name: 'Show minimap'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-minimap-open', 'true');
+
+    const map = figure.locator('[data-plantuml-minimap]');
+    await expect(map).toBeVisible();
+    // The map carries a scaled copy of the diagram, hidden from assistive technology.
+    await expect(map.locator('div[aria-hidden="true"] svg').first()).toBeVisible();
+
+    // Zoom in so only part of the diagram is visible; the map is what brings the rest back.
+    const zoomIn = figure.getByRole('button', {name: 'Zoom in'});
+    for (let i = 0; i < 4; i += 1) await zoomIn.click();
+    await expect.poll(() => zoomLevel(page)).toBeGreaterThan(2);
+
+    // Button zoom anchors top-left, so the view sits at the top-left; pressing near the
+    // bottom-right of the map must pan the layer up and left. `click` with a position
+    // rather than raw mouse coordinates: the map lives at the bottom of the stage, which
+    // can be below the fold, and a raw mouse press outside the window lands on nothing.
+    const canvas = map.locator('div[aria-hidden="true"]').first();
+    await canvas.scrollIntoViewIfNeeded();
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('minimap canvas has no box');
+    const layer = layerOf(figure);
+    const before = await rectOf(layer);
+
+    await canvas.click({position: {x: box.width - 6, y: box.height - 6}});
+
+    await expect.poll(async () => (await rectOf(layer)).x).toBeLessThan(before.x);
+
+    await figure.getByRole('button', {name: 'Close minimap'}).click();
+    await expect(map).toHaveCount(0);
+    await expect(figure).not.toHaveAttribute('data-plantuml-minimap-open', 'true');
   });
 
   test('does not interfere with ordinary diagram pages', async ({page}) => {

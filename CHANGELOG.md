@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-13
+
+### Added
+
+- **A Fit control in the maximized view.** While a diagram fills the screen, one press
+  returns it to the fitted scale — the whole diagram filling the screen, magnified or shrunk
+  as the picture demands — after zooming or panning away from it. Maximizing itself now
+  opens at that truly fitted scale too: the view's content measurement tracks the rendered
+  picture rather than the full-width frame, which is also what tightens the minimap around
+  the actual diagram. (The pan clamp deliberately keeps its old frame-wide bounds, so focal
+  wheel zoom holds the point under the pointer exactly as before.) The button is
+  deliberately absent from the inline toolbar, where the frame grows with the diagram and a
+  fit would merely duplicate Reset; it sits between Reset and Maximize, is drawn as inline
+  SVG like the rest of the toolbar, and carries `aria-label="Fit diagram to screen"`.
+
+- **A minimap.** A new toggle in the bottom-left corner opens a small copy of the diagram
+  with a rectangle marking what the viewport currently shows; pressing or dragging anywhere
+  on the map centres the view there, so a single press doubles as "jump there". The map
+  follows every zoom, pan and resize without re-rendering the figure — it subscribes to the
+  same imperative transform writes the zoom hook itself uses — and works while maximized.
+  The figure carries `data-plantuml-minimap-open="true"` while the map is up.
+
+  The map is pointer-only and hidden from assistive technology on purpose: the real viewport
+  is already keyboard-operable, so a second, duplicated view of the same diagram would add
+  noise without adding a capability. Its close button stays outside the hidden subtree and
+  remains focusable.
+
+- **Search within a diagram.** The new lens button opens a search bar beside the toolbar: a
+  case-insensitive substring search over the rendered SVG's text. Every match is marked with
+  `data-plantuml-search-match` and highlighted from the stylesheet — the cached SVG string is
+  never mutated — and the current match additionally carries `data-plantuml-search-current`.
+  Enter and the chevron buttons step through the matches (Shift+Enter backwards), each step
+  centres the view on its match at the current zoom level, and Escape or ✕ closes the bar
+  and sweeps every highlight. The figure carries `data-plantuml-search-open="true"` while
+  the bar is up.
+
+- **Deep links into diagrams.** A URL hash of the form `#graph?highlight-node=REACTION_1234`
+  focuses a node: every diagram on the page reacts - none needs an id of its own, and a
+  diagram without the node does nothing - the page scrolls to the first matching figure, the
+  node is marked with `data-plantuml-focused-node` and highlighted from the stylesheet, and
+  a zoomable diagram snaps to 100% centred on it. The hash is watched through the router, so
+  every kind of navigation reacts — pushed, replaced, popped and native `#…` clicks alike,
+  including a `<Link>` navigation that *drops* the hash, which sweeps the highlight — and a
+  `#graph?…` hash defeats lazy loading so below-the-fold targets still react.
+
+  The identifier resolves through a ladder - explicit SVG `id` (Graphviz `node [id="…"]`),
+  the PlantUML alias (`component "X" as REACTION_1234`, aliased notes included, via the
+  `data-qualified-name` the engine writes into its SVG), a self-anchor link
+  (Graphviz `URL="#graph?…"`, which doubles as the node's own permalink when clicked),
+  Graphviz node names via their `<title>`, multiline labels with `%0A`-encoded newlines
+  matched against consecutive text lines within one node's group, and finally a
+  case-insensitive substring of a single line. The first level that matches wins, so a
+  deterministic id always beats loose text matching.
+
+  Alongside this, Graphviz author links are pinned by tests, and sanitization keeps
+  `target="_top"` on links instead of silently dropping it. One engine limitation surfaced
+  and is now documented: the bundled PlantUML engine renders `[[url]]` link text but emits
+  no `<a>` elements, so PlantUML links are not clickable - which is why PlantUML deep-link
+  ids ride on aliases rather than on links.
+
+### Fixed
+
+- **The rendered SVG is no longer re-parsed on every re-render under React 19.** React 19
+  compares `dangerouslySetInnerHTML` by the wrapper object's identity rather than by its
+  `__html` string, so the inline `{{__html: svg}}` literal made every state change — opening
+  the source view, maximizing, a copy confirmation — throw away and re-parse the entire SVG
+  subtree. The wrapper is now memoized per SVG string. This is also what makes the search's
+  in-DOM highlights survive unrelated re-renders.
+
 ## [1.3.1]
 
 ### Fixed
@@ -380,7 +449,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.1.2...v1.2.0
