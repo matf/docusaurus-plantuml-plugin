@@ -50,21 +50,22 @@ test.describe('zoom and pan', () => {
     await expect(wide.locator('div[role="img"] > svg')).toHaveCount(1);
     const group = wide.getByRole('group', {name: /zoom controls/});
     await expect(group).toBeVisible();
-    // Search, zoom out, zoom in, reset, fit, maximize, and the source toggle.
-    await expect(group.getByRole('button')).toHaveCount(7);
+    // Search, zoom out, zoom in, reset, maximize, and the source toggle. Fit is absent
+    // here on purpose — it exists only in the maximized view, where it can fill a screen.
+    await expect(group.getByRole('button')).toHaveCount(6);
+    await expect(group.getByRole('button', {name: 'Fit diagram to screen'})).toHaveCount(0);
     await expect(group.getByRole('button', {name: 'Maximize diagram'})).toBeVisible();
     await expect(group.getByRole('button', {name: 'Show diagram source'})).toBeVisible();
 
     // Every control is drawn, not typed. `⛶` U+26F6 had no glyph on a stock Linux desktop,
     // so the maximize button used to render as a tofu box for a whole platform's readers.
     // See issue #21. Asserted against the real build because this is a rendering bug.
-    await expect(group.locator('button > svg')).toHaveCount(7);
+    await expect(group.locator('button > svg')).toHaveCount(6);
     for (const name of [
       'Search diagram',
       'Zoom out',
       'Zoom in',
       'Reset zoom',
-      'Fit diagram to view',
       'Maximize diagram',
     ]) {
       const button = group.getByRole('button', {name});
@@ -137,26 +138,35 @@ test.describe('zoom and pan', () => {
       .toBeLessThanOrEqual(1);
   });
 
-  test('fit brings the whole diagram back into view after zooming in', async ({page}) => {
+  test('fit fills the maximized screen with the whole diagram', async ({page}) => {
     await page.goto('docs/zoom');
     await waitForDiagrams(page, 2);
 
     const figure = page.locator(zoomable).first();
+    await figure.getByRole('button', {name: 'Maximize diagram'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-maximized', 'true');
+
+    // Wander off the fitted opening view, then Fit must find the way back.
     const zoomIn = figure.getByRole('button', {name: 'Zoom in'});
     for (let i = 0; i < 5; i += 1) await zoomIn.click();
-    await expect.poll(() => zoomLevel(page)).toBeGreaterThan(2);
 
-    await figure.getByRole('button', {name: 'Fit diagram to view'}).click();
+    await figure.getByRole('button', {name: 'Fit diagram to screen'}).click();
 
     // Polled: discrete zoom steps ease over 150ms, so the geometry settles after the click.
+    // Fitted means contained — and *filling* the screen: at the fit scale one axis runs
+    // edge to edge, which is what separates this from a mere reset.
     const viewport = page.locator(viewportSelector).first();
     await expect
       .poll(async () => {
         const layer = await rectOf(layerOf(figure));
         const box = await rectOf(viewport);
-        return layer.width <= box.width + 1 && layer.height <= box.height + 1;
+        const contained = layer.width <= box.width + 1 && layer.height <= box.height + 1;
+        const fills = layer.width >= box.width - 2 || layer.height >= box.height - 2;
+        return contained && fills;
       })
       .toBe(true);
+
+    await page.keyboard.press('Escape');
   });
 
   test('a plain wheel scrolls the page instead of zooming', async ({page}) => {

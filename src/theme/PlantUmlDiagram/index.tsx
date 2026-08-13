@@ -629,11 +629,16 @@ export default function PlantUmlDiagram({
                   <ResetZoomIcon />
                 </button>
               )}
-              {!sourceOpen && (
+              {/*
+               * Fit exists only while maximized: there it fills the screen with the diagram,
+               * while inline the frame already grows with the picture, so a fit would land
+               * on 100% and duplicate Reset.
+               */}
+              {!sourceOpen && zoom.maximized && (
                 <button
                   type="button"
                   className={styles.toolbarButton}
-                  aria-label="Fit diagram to view"
+                  aria-label="Fit diagram to screen"
                   onClick={zoom.fit}
                 >
                   <FitIcon />

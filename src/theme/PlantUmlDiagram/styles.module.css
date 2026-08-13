@@ -82,6 +82,20 @@
 }
 
 .layer {
+  /*
+   * Shrinks to the rendered picture instead of stretching across the viewport. The zoom
+   * hook measures content through `offsetWidth`/`offsetHeight` — layout sizes, immune to
+   * both the transform and its transition — so this is what makes those measurements mean
+   * "the diagram" rather than "the full-width frame". Fitting (which fills the screen when
+   * maximized) and the minimap both read that measurement.
+   *
+   * `max-width` is load-bearing, not decoration: in intrinsic (`fit-content`) sizing the
+   * SVG's own `max-width: 100%` resolves against an indefinite width and is ignored, so
+   * without this cap a diagram wider than the column would blow the layer out to the SVG's
+   * intrinsic width and overflow the frame.
+   */
+  width: fit-content;
+  max-width: 100%;
   transform-origin: 0 0;
   transition: transform var(--plantuml-zoom-transition, 150ms) ease-out;
 }

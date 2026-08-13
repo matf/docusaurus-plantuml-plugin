@@ -529,21 +529,23 @@ pannable by default, with a small control toolbar in the top-right corner.
 
 ### Interaction
 
-| Input                               | What happens                            |
-| ----------------------------------- | --------------------------------------- |
-| Plain scroll wheel                  | Scrolls the page. Never intercepted.    |
-| **Ctrl** + wheel, or trackpad pinch | Zooms about the pointer                 |
-| Drag                                | Pans, once zoomed in                    |
-| One finger on a touchscreen         | Scrolls the page                        |
-| Two-finger pinch on a touchscreen   | The browser's own page zoom             |
-| Toolbar buttons                     | Zoom out, zoom in, reset, fit, maximize |
+| Input                               | What happens                                                   |
+| ----------------------------------- | -------------------------------------------------------------- |
+| Plain scroll wheel                  | Scrolls the page. Never intercepted.                           |
+| **Ctrl** + wheel, or trackpad pinch | Zooms about the pointer                                        |
+| Drag                                | Pans, once zoomed in                                           |
+| One finger on a touchscreen         | Scrolls the page                                               |
+| Two-finger pinch on a touchscreen   | The browser's own page zoom                                    |
+| Toolbar buttons                     | Zoom out, zoom in, reset, maximize — plus fit, while maximized |
 
 `Cmd` + wheel is deliberately **not** intercepted: on macOS that is the browser's own page
 zoom, and taking it over would fight the platform.
 
-**Fit** scales the diagram so all of it is visible — the same fitted view maximizing opens
-with. **Reset** returns to 100% instead. The two differ whenever the frame is smaller than
-the diagram: while maximized, or when a `--plantuml-zoom-max-height` caps the frame's height.
+**Fit** appears only while the diagram is maximized: it scales the diagram to fill the
+screen — the fitted view maximizing opens with — after you have zoomed or panned away from
+it. It is deliberately absent from the inline toolbar: the inline frame grows with the
+diagram, so at 100% everything is already visible and a fit would merely duplicate
+**Reset**.
 
 ### Keyboard
 
@@ -596,9 +598,11 @@ same diagram would add noise without adding a capability.
 
 ### Maximizing
 
-The maximize button expands the diagram to fill the browser viewport, fitted to the
-available space, over an opaque background. <kbd>Escape</kbd> or the same button restores it,
-along with whatever zoom level you had before.
+The maximize button expands the diagram to fill the browser viewport over an opaque
+background, opening at the fitted scale — magnified or shrunk so the whole diagram fills the
+screen. The **fit** button (present only in this view) returns to that scale after zooming
+or panning. <kbd>Escape</kbd> or the maximize button restores the inline view, along with
+whatever zoom level you had before.
 
 This is an in-page overlay rather than the Fullscreen API. `requestFullscreen()` takes the
 entire browser window fullscreen in Firefox instead of presenting the element, and its

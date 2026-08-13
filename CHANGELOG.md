@@ -9,13 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **A Fit control in the zoom toolbar.** One press scales the diagram so all of it is
-  visible — the same fitted view maximizing has always opened with, now reachable without
-  maximizing. It differs from Reset whenever the frame is smaller than the diagram: while
-  maximized, or when an author-set `--plantuml-zoom-max-height` caps the frame's height,
-  Reset returns to 100% while Fit shows everything. The button sits between Reset and
-  Maximize, is drawn as inline SVG like the rest of the toolbar, and carries
-  `aria-label="Fit diagram to view"`.
+- **A Fit control in the maximized view.** While a diagram fills the screen, one press
+  returns it to the fitted scale — the whole diagram filling the screen, magnified or shrunk
+  as the picture demands — after zooming or panning away from it. Maximizing itself now
+  opens at that truly fitted scale too: the view's content measurement tracks the rendered
+  picture rather than the full-width frame, which is also what tightens the minimap around
+  the actual diagram. (The pan clamp deliberately keeps its old frame-wide bounds, so focal
+  wheel zoom holds the point under the pointer exactly as before.) The button is
+  deliberately absent from the inline toolbar, where the frame grows with the diagram and a
+  fit would merely duplicate Reset; it sits between Reset and Maximize, is drawn as inline
+  SVG like the rest of the toolbar, and carries `aria-label="Fit diagram to screen"`.
 
 - **A minimap.** A new toggle in the bottom-left corner opens a small copy of the diagram
   with a rectangle marking what the viewport currently shows; pressing or dragging anywhere

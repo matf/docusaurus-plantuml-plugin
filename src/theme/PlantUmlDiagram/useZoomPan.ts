@@ -50,7 +50,7 @@ export interface ZoomPanHandle {
   zoomIn: () => void;
   zoomOut: () => void;
   reset: () => void;
-  /** Fits the whole diagram inside the viewport, at whatever scale that takes. */
+  /** Fits the whole diagram inside the viewport, at whatever scale that takes to fill it. */
   fit: () => void;
   toggleMaximize: () => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
@@ -96,7 +96,11 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
 
   /**
    * Layout sizes, never `getBoundingClientRect()`: the layer's rect includes the transform we
-   * are about to change, which would feed back into the next measurement.
+   * are about to change — and, mid-easing, the transition — which would feed back into the
+   * next measurement. The layer is `width: fit-content`, so its layout size *is* the rendered
+   * picture's, not the full-width frame's; that is what lets fitting fill a maximized screen
+   * and keeps the minimap honest about where the diagram ends. The clamp deliberately runs
+   * against wider bounds — see {@link clampBounds}.
    */
   const measure = useCallback((): Bounds => {
     const viewport = viewportRef.current;
@@ -108,6 +112,21 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
       contentHeight: layer?.offsetHeight ?? 0,
     };
   }, []);
+
+  /**
+   * The bounds the clamp runs against: the picture or the viewport, whichever is *wider*.
+   *
+   * Fitting wants the true picture size; the clamp deliberately does not. Focal zoom must
+   * hold the point under the pointer even when that slides the picture's right edge inside
+   * the viewport — clamping to the picture itself yanks the diagram sideways mid-gesture the
+   * moment that edge is reached. Flooring the width at the viewport's restores exactly the
+   * geometry the full-width layer always gave. Height is not floored: the layer never
+   * stretched vertically, so the height clamp has always run against the real picture.
+   */
+  const clampBounds = useCallback((): Bounds => {
+    const bounds = measure();
+    return {...bounds, contentWidth: Math.max(bounds.contentWidth, bounds.viewportWidth)};
+  }, [measure]);
 
   const write = useCallback((next: Transform) => {
     transformRef.current = next;
@@ -131,9 +150,9 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
 
   const apply = useCallback(
     (next: Transform) => {
-      write(clampTransform(next, measure()));
+      write(clampTransform(next, clampBounds()));
     },
-    [measure, write],
+    [clampBounds, write],
   );
 
   const reset = useCallback(() => {
@@ -162,12 +181,13 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
   const zoomOut = useCallback(() => zoomByStep(1 / SCALE_STEP), [zoomByStep]);
 
   /**
-   * The same fitted view maximizing opens with, available without maximizing.
+   * The fitted view maximizing opens with: the diagram scaled to fill the screen, magnified
+   * or shrunk as the picture demands, capped at {@link MAX_SCALE}.
    *
-   * Inline, the viewport is usually as tall as the diagram itself, so this often lands on
-   * 100% — but with an author-set `--plantuml-zoom-max-height`, or while maximized, it is the
-   * one-press way back to "show me everything". Translation returns to the origin because a
-   * diagram that fits is left-aligned, exactly as `clampTransform` would force anyway.
+   * Only offered while maximized. Inline it would duplicate Reset, because the inline frame
+   * grows with the diagram — at 100% everything is already visible, so there is nothing for
+   * a fit to add. Translation returns to the origin because a diagram that fits is
+   * left-aligned, exactly as `clampTransform` would force anyway.
    */
   const fit = useCallback(() => {
     apply({...IDENTITY, k: fitScale(measure())});

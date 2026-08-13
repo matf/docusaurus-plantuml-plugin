@@ -210,8 +210,9 @@ describe('accessible structure', () => {
     expect(screen.getByRole('button', {name: 'Zoom in'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Zoom out'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Reset zoom'})).toBeInTheDocument();
-    expect(screen.getByRole('button', {name: 'Fit diagram to view'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Maximize diagram'})).toBeInTheDocument();
+    // Fit lives in the maximized view only: inline it would land on 100% and duplicate Reset.
+    expect(screen.queryByRole('button', {name: 'Fit diagram to screen'})).toBeNull();
   });
 
   it('draws every control as SVG rather than as a font character', async () => {
@@ -220,13 +221,7 @@ describe('accessible structure', () => {
     // be installed. See issue #21.
     await renderReady();
 
-    for (const name of [
-      'Zoom in',
-      'Zoom out',
-      'Reset zoom',
-      'Fit diagram to view',
-      'Maximize diagram',
-    ]) {
+    for (const name of ['Zoom in', 'Zoom out', 'Reset zoom', 'Maximize diagram']) {
       const button = screen.getByRole('button', {name});
       expect(button.querySelector('svg'), `${name} should be drawn`).toBeInTheDocument();
       // Nothing left for a missing font to fail to draw. This is the assertion that stops a
@@ -358,34 +353,56 @@ describe('controls', () => {
     expect(layer().style.transform).toBe('translate(0px, 0px) scale(1)');
   });
 
-  it('fits the whole diagram into the viewport', async () => {
+  it('offers fit only while maximized, drawn like every other control', async () => {
+    await renderReady();
+    expect(screen.queryByRole('button', {name: 'Fit diagram to screen'})).toBeNull();
+
+    act(() => screen.getByRole('button', {name: 'Maximize diagram'}).click());
+
+    const fit = screen.getByRole('button', {name: 'Fit diagram to screen'});
+    expect(fit.querySelector('svg')).toBeInTheDocument();
+    expect(fit.textContent ?? '').toMatch(/^[\x20-\x7e]*$/);
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    });
+    expect(screen.queryByRole('button', {name: 'Fit diagram to screen'})).toBeNull();
+  });
+
+  it('re-fits the whole diagram to the screen while maximized', async () => {
     await renderReady();
     // jsdom lays nothing out, so the sizes the hook measures are stubbed directly: an
-    // 800×600 diagram in a 400×600 viewport fits at exactly half scale. This is what
+    // 800×600 diagram on a 400×600 screen fits at exactly half scale. This is what
     // separates Fit from Reset — reset would land on 1 whatever the sizes.
     Object.defineProperty(viewport(), 'clientWidth', {configurable: true, value: 400});
     Object.defineProperty(viewport(), 'clientHeight', {configurable: true, value: 600});
     Object.defineProperty(layer(), 'offsetWidth', {configurable: true, value: 800});
     Object.defineProperty(layer(), 'offsetHeight', {configurable: true, value: 600});
 
-    act(() => screen.getByRole('button', {name: 'Fit diagram to view'}).click());
+    act(() => screen.getByRole('button', {name: 'Maximize diagram'}).click());
+    // Maximizing already opens fitted; wander off it, then Fit must find the way back.
+    act(() => screen.getByRole('button', {name: 'Zoom in'}).click());
+    fireEvent.keyDown(viewport(), {key: 'ArrowRight'});
+
+    act(() => screen.getByRole('button', {name: 'Fit diagram to screen'}).click());
 
     expect(zoomLevel()).toBe('0.5');
     expect(layer().style.transform).toBe('translate(0px, 0px) scale(0.5)');
   });
 
-  it('discards the pan when fitting, so the fitted diagram starts at the origin', async () => {
+  it('fills the screen with a small diagram when fitting, since the output is vector', async () => {
     await renderReady();
+    // A 200×150 diagram on a 400×600 screen: the width ratio (2) is the constraining axis.
     Object.defineProperty(viewport(), 'clientWidth', {configurable: true, value: 400});
     Object.defineProperty(viewport(), 'clientHeight', {configurable: true, value: 600});
-    Object.defineProperty(layer(), 'offsetWidth', {configurable: true, value: 800});
-    Object.defineProperty(layer(), 'offsetHeight', {configurable: true, value: 600});
+    Object.defineProperty(layer(), 'offsetWidth', {configurable: true, value: 200});
+    Object.defineProperty(layer(), 'offsetHeight', {configurable: true, value: 150});
 
-    act(() => screen.getByRole('button', {name: 'Zoom in'}).click());
-    fireEvent.keyDown(viewport(), {key: 'ArrowRight'});
-    act(() => screen.getByRole('button', {name: 'Fit diagram to view'}).click());
+    act(() => screen.getByRole('button', {name: 'Maximize diagram'}).click());
+    act(() => screen.getByRole('button', {name: 'Zoom out'}).click());
+    act(() => screen.getByRole('button', {name: 'Fit diagram to screen'}).click());
 
-    expect(layer().style.transform).toBe('translate(0px, 0px) scale(0.5)');
+    expect(zoomLevel()).toBe('2');
   });
 
   it('offers maximize everywhere, with no capability detection', async () => {
