@@ -11,6 +11,7 @@ import type {DiagramEngine, DiagramStatus} from '../../runtime/types.js';
 import {usePlantUmlConfig} from '../usePlantUmlConfig.js';
 import {
   CloseIcon,
+  FitIcon,
   MaximizeIcon,
   ResetZoomIcon,
   SourceIcon,
@@ -474,6 +475,16 @@ export default function PlantUmlDiagram({
                 onClick={zoom.reset}
               >
                 <ResetZoomIcon />
+              </button>
+            )}
+            {!sourceOpen && (
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label="Fit diagram to view"
+                onClick={zoom.fit}
+              >
+                <FitIcon />
               </button>
             )}
             <button

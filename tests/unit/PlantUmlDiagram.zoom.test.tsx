@@ -210,6 +210,7 @@ describe('accessible structure', () => {
     expect(screen.getByRole('button', {name: 'Zoom in'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Zoom out'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Reset zoom'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Fit diagram to view'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Maximize diagram'})).toBeInTheDocument();
   });
 
@@ -219,7 +220,13 @@ describe('accessible structure', () => {
     // be installed. See issue #21.
     await renderReady();
 
-    for (const name of ['Zoom in', 'Zoom out', 'Reset zoom', 'Maximize diagram']) {
+    for (const name of [
+      'Zoom in',
+      'Zoom out',
+      'Reset zoom',
+      'Fit diagram to view',
+      'Maximize diagram',
+    ]) {
       const button = screen.getByRole('button', {name});
       expect(button.querySelector('svg'), `${name} should be drawn`).toBeInTheDocument();
       // Nothing left for a missing font to fail to draw. This is the assertion that stops a
@@ -349,6 +356,36 @@ describe('controls', () => {
 
     expect(zoomLevel()).toBe('1');
     expect(layer().style.transform).toBe('translate(0px, 0px) scale(1)');
+  });
+
+  it('fits the whole diagram into the viewport', async () => {
+    await renderReady();
+    // jsdom lays nothing out, so the sizes the hook measures are stubbed directly: an
+    // 800×600 diagram in a 400×600 viewport fits at exactly half scale. This is what
+    // separates Fit from Reset — reset would land on 1 whatever the sizes.
+    Object.defineProperty(viewport(), 'clientWidth', {configurable: true, value: 400});
+    Object.defineProperty(viewport(), 'clientHeight', {configurable: true, value: 600});
+    Object.defineProperty(layer(), 'offsetWidth', {configurable: true, value: 800});
+    Object.defineProperty(layer(), 'offsetHeight', {configurable: true, value: 600});
+
+    act(() => screen.getByRole('button', {name: 'Fit diagram to view'}).click());
+
+    expect(zoomLevel()).toBe('0.5');
+    expect(layer().style.transform).toBe('translate(0px, 0px) scale(0.5)');
+  });
+
+  it('discards the pan when fitting, so the fitted diagram starts at the origin', async () => {
+    await renderReady();
+    Object.defineProperty(viewport(), 'clientWidth', {configurable: true, value: 400});
+    Object.defineProperty(viewport(), 'clientHeight', {configurable: true, value: 600});
+    Object.defineProperty(layer(), 'offsetWidth', {configurable: true, value: 800});
+    Object.defineProperty(layer(), 'offsetHeight', {configurable: true, value: 600});
+
+    act(() => screen.getByRole('button', {name: 'Zoom in'}).click());
+    fireEvent.keyDown(viewport(), {key: 'ArrowRight'});
+    act(() => screen.getByRole('button', {name: 'Fit diagram to view'}).click());
+
+    expect(layer().style.transform).toBe('translate(0px, 0px) scale(0.5)');
   });
 
   it('offers maximize everywhere, with no capability detection', async () => {

@@ -529,17 +529,21 @@ pannable by default, with a small control toolbar in the top-right corner.
 
 ### Interaction
 
-| Input                               | What happens                         |
-| ----------------------------------- | ------------------------------------ |
-| Plain scroll wheel                  | Scrolls the page. Never intercepted. |
-| **Ctrl** + wheel, or trackpad pinch | Zooms about the pointer              |
-| Drag                                | Pans, once zoomed in                 |
-| One finger on a touchscreen         | Scrolls the page                     |
-| Two-finger pinch on a touchscreen   | The browser's own page zoom          |
-| Toolbar buttons                     | Zoom out, zoom in, reset, maximize   |
+| Input                               | What happens                            |
+| ----------------------------------- | --------------------------------------- |
+| Plain scroll wheel                  | Scrolls the page. Never intercepted.    |
+| **Ctrl** + wheel, or trackpad pinch | Zooms about the pointer                 |
+| Drag                                | Pans, once zoomed in                    |
+| One finger on a touchscreen         | Scrolls the page                        |
+| Two-finger pinch on a touchscreen   | The browser's own page zoom             |
+| Toolbar buttons                     | Zoom out, zoom in, reset, fit, maximize |
 
 `Cmd` + wheel is deliberately **not** intercepted: on macOS that is the browser's own page
 zoom, and taking it over would fight the platform.
+
+**Fit** scales the diagram so all of it is visible — the same fitted view maximizing opens
+with. **Reset** returns to 100% instead. The two differ whenever the frame is smaller than
+the diagram: while maximized, or when a `--plantuml-zoom-max-height` caps the frame's height.
 
 ### Keyboard
 
@@ -568,7 +572,7 @@ site colour mode changes.
 
 ### Maximizing
 
-The fourth toolbar button expands the diagram to fill the browser viewport, fitted to the
+The maximize button expands the diagram to fill the browser viewport, fitted to the
 available space, over an opaque background. <kbd>Escape</kbd> or the same button restores it,
 along with whatever zoom level you had before.
 
@@ -601,8 +605,8 @@ Alice -> Bob : Hello
 A reader who needs to zoom is rarely the author who would have enabled it, so leaving it off
 would mean most readers never discover it. The costs are real and worth knowing:
 
-- Each zoomable diagram adds roughly **four keyboard tab stops** (the viewport and three or
-  four buttons). On a page with six diagrams that is a meaningful amount of tabbing.
+- Each zoomable diagram adds a **keyboard tab stop for the viewport and one per toolbar
+  button**. On a page with six diagrams that is a meaningful amount of tabbing.
 - The rendered markup gains a viewport and transform wrapper around the `role="img"` container.
   Site CSS that targets `[data-plantuml-diagram] > div[role="img"]` as a **direct child** needs
   updating — see [Accessibility](#accessibility) for both shapes.

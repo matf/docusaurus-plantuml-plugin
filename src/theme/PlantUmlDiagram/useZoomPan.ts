@@ -49,6 +49,8 @@ export interface ZoomPanHandle {
   zoomIn: () => void;
   zoomOut: () => void;
   reset: () => void;
+  /** Fits the whole diagram inside the viewport, at whatever scale that takes. */
+  fit: () => void;
   toggleMaximize: () => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   /** Whether the diagram currently fills the browser viewport. */
@@ -132,6 +134,18 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
 
   const zoomIn = useCallback(() => zoomByStep(SCALE_STEP), [zoomByStep]);
   const zoomOut = useCallback(() => zoomByStep(1 / SCALE_STEP), [zoomByStep]);
+
+  /**
+   * The same fitted view maximizing opens with, available without maximizing.
+   *
+   * Inline, the viewport is usually as tall as the diagram itself, so this often lands on
+   * 100% — but with an author-set `--plantuml-zoom-max-height`, or while maximized, it is the
+   * one-press way back to "show me everything". Translation returns to the origin because a
+   * diagram that fits is left-aligned, exactly as `clampTransform` would force anyway.
+   */
+  const fit = useCallback(() => {
+    apply({...IDENTITY, k: fitScale(measure())});
+  }, [apply, measure]);
 
   const toggleMaximize = useCallback(() => {
     setMaximized((previous) => !previous);
@@ -398,6 +412,7 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     zoomIn,
     zoomOut,
     reset,
+    fit,
     toggleMaximize,
     onKeyDown,
     maximized,

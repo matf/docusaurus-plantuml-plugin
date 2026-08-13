@@ -62,6 +62,19 @@ export function ResetZoomIcon(): ReactElement {
   );
 }
 
+/**
+ * Fit to view: the maximize corners with the diagram drawn inside them, so the two controls
+ * read as siblings — both are about the frame, one keeps you in the page.
+ */
+export function FitIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" />
+      <rect x="5.5" y="5.5" width="5" height="5" rx="1" />
+    </svg>
+  );
+}
+
 /** Replaces `⛶` U+26F6, the character that had no glyph. */
 export function MaximizeIcon(): ReactElement {
   return (

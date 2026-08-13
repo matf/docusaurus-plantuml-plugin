@@ -50,16 +50,22 @@ test.describe('zoom and pan', () => {
     await expect(wide.locator('div[role="img"] > svg')).toHaveCount(1);
     const group = wide.getByRole('group', {name: /zoom controls/});
     await expect(group).toBeVisible();
-    // Zoom out, zoom in, reset, maximize, and the source toggle.
-    await expect(group.getByRole('button')).toHaveCount(5);
+    // Zoom out, zoom in, reset, fit, maximize, and the source toggle.
+    await expect(group.getByRole('button')).toHaveCount(6);
     await expect(group.getByRole('button', {name: 'Maximize diagram'})).toBeVisible();
     await expect(group.getByRole('button', {name: 'Show diagram source'})).toBeVisible();
 
     // Every control is drawn, not typed. `⛶` U+26F6 had no glyph on a stock Linux desktop,
     // so the maximize button used to render as a tofu box for a whole platform's readers.
     // See issue #21. Asserted against the real build because this is a rendering bug.
-    await expect(group.locator('button > svg')).toHaveCount(5);
-    for (const name of ['Zoom out', 'Zoom in', 'Reset zoom', 'Maximize diagram']) {
+    await expect(group.locator('button > svg')).toHaveCount(6);
+    for (const name of [
+      'Zoom out',
+      'Zoom in',
+      'Reset zoom',
+      'Fit diagram to view',
+      'Maximize diagram',
+    ]) {
       const button = group.getByRole('button', {name});
       await expect(button.locator('svg')).toHaveCount(1);
       // Nothing left that a missing font could fail to draw.
@@ -128,6 +134,28 @@ test.describe('zoom and pan', () => {
     await expect
       .poll(async () => Math.abs((await rectOf(layerOf(figure))).width - before.width))
       .toBeLessThanOrEqual(1);
+  });
+
+  test('fit brings the whole diagram back into view after zooming in', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    const zoomIn = figure.getByRole('button', {name: 'Zoom in'});
+    for (let i = 0; i < 5; i += 1) await zoomIn.click();
+    await expect.poll(() => zoomLevel(page)).toBeGreaterThan(2);
+
+    await figure.getByRole('button', {name: 'Fit diagram to view'}).click();
+
+    // Polled: discrete zoom steps ease over 150ms, so the geometry settles after the click.
+    const viewport = page.locator(viewportSelector).first();
+    await expect
+      .poll(async () => {
+        const layer = await rectOf(layerOf(figure));
+        const box = await rectOf(viewport);
+        return layer.width <= box.width + 1 && layer.height <= box.height + 1;
+      })
+      .toBe(true);
   });
 
   test('a plain wheel scrolls the page instead of zooming', async ({page}) => {
