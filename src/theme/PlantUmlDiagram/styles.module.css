@@ -257,6 +257,14 @@
   position: absolute;
   bottom: 3.25rem;
   left: 0.5rem;
+  /*
+   * The close control sits *beside* the map, not floating over it: a wide, short diagram
+   * makes a map only a couple of buttons tall, and an overlaid control would cover — and
+   * steal presses from — the map's whole right end.
+   */
+  display: flex;
+  gap: 0.25rem;
+  align-items: flex-start;
   max-width: calc(100% - 1rem);
   padding: 0.25rem;
   border: 1px solid var(--ifm-color-emphasis-300);
@@ -294,13 +302,9 @@
 }
 
 .minimapClose {
-  position: absolute;
-  top: 0.375rem;
-  right: 0.375rem;
+  flex: none;
   width: 1.5rem;
   height: 1.5rem;
-  background: var(--ifm-background-surface-color);
-  opacity: 0.92;
 }
 
 .visuallyHidden {
