@@ -6,3 +6,8 @@ export default function useBaseUrl(url: string): string {
   const base = stubState.baseUrl.endsWith('/') ? stubState.baseUrl : `${stubState.baseUrl}/`;
   return `${base}${url.replace(/^\//, '')}`;
 }
+
+/** Mirrors `useBaseUrlUtils`: the hook-shaped variant used from event handlers. */
+export function useBaseUrlUtils(): {withBaseUrl: (url: string) => string} {
+  return {withBaseUrl: useBaseUrl};
+}

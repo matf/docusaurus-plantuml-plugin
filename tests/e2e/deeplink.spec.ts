@@ -7,14 +7,16 @@ const ORIGIN = new URL(process.env['PLANTUML_E2E_BASE_URL'] as string).origin;
 const FOCUSED = '[data-plantuml-focused-node]';
 
 /**
- * The links fixture page has two diagrams: a PlantUML component diagram addressed through
- * aliases (`MESSAGE_MY_GREAT_COMMAND`, an aliased note, a multiline label `Archive\n12345`),
- * and a Graphviz diagram with an explicit node id (`GRAPH-HANDLER-9`), a self-anchor
- * (`SELF-NODE-3`) and an external link.
+ * The links fixture page has three diagrams: a PlantUML component diagram addressed through
+ * aliases (`MESSAGE_MY_GREAT_COMMAND`, an aliased note, a multiline label `Archive\n12345`,
+ * and a cross-page link on `JUMP_CROSS`), a Graphviz diagram with an explicit node id
+ * (`GRAPH-HANDLER-9`), a self-anchor (`SELF-NODE-3`), a cross-page link and an external
+ * link, and a C4 diagram whose `!include <C4/C4_Container>` shifts the engine's line
+ * numbers — the case that forces alias-based link correlation. Cross-page links land on
+ * `docs/links-target`, whose diagram contains `TARGET_NODE_7`.
  *
- * PlantUML `[[…]]` hyperlinks are deliberately absent from the fixture: the bundled engine
- * renders their text but emits no `<a>` elements, so there is nothing to click. Graphviz
- * links are the clickable ones.
+ * PlantUML `[[…]]` anchors in these diagrams are synthesized by the plugin from the fence
+ * source; the engine itself emits none.
  */
 test.describe('diagram links and deep links', () => {
   test('renders Graphviz author links as real, sanitized anchors', async ({page}) => {
@@ -99,6 +101,66 @@ test.describe('diagram links and deep links', () => {
     await expect.poll(() => page.url()).toContain('#graph?highlight-node=SELF-NODE-3');
     await expect(page.locator(FOCUSED)).toHaveCount(1);
     await expect(page.locator(FOCUSED)).toHaveText(/self link/);
+  });
+
+  test('a PlantUML node links to a diagram on another page, without a reload', async ({page}) => {
+    await page.goto('docs/links');
+    await waitForDiagrams(page, 3);
+    // Survives history navigation, dies on a full load — the SPA proof.
+    await page.evaluate(() => {
+      (window as unknown as {__sameDocument?: boolean}).__sameDocument = true;
+    });
+
+    const figures = page.locator('[data-plantuml-diagram]');
+    await figures.nth(0).locator('svg a[data-plantuml-diagram-link][href*="links-target"]').click();
+
+    await expect(page).toHaveURL(/links-target#graph\?highlight-node=TARGET_NODE_7/);
+    await waitForDiagrams(page, 1);
+    const focused = page.locator(FOCUSED);
+    await expect(focused).toHaveCount(1);
+    await expect(focused).toHaveAttribute('data-qualified-name', 'TARGET_NODE_7');
+    expect(
+      await page.evaluate(() => (window as unknown as {__sameDocument?: boolean}).__sameDocument),
+    ).toBe(true);
+  });
+
+  test('a node from a stdlib-include diagram links across pages too', async ({page}) => {
+    // `!include <C4/C4_Container>` shifts the engine's line numbers, so this passes only
+    // through the alias-based correlation.
+    await page.goto('docs/links');
+    await waitForDiagrams(page, 3);
+
+    const c4 = page.locator('[data-plantuml-diagram]').nth(2);
+    const link = c4.locator('svg a[data-plantuml-diagram-link][href*="links-target"]');
+    await expect(link).toHaveCount(1);
+    await link.click();
+
+    await expect(page).toHaveURL(/links-target#graph\?highlight-node=TARGET_NODE_7/);
+    await waitForDiagrams(page, 1);
+    await expect(page.locator(FOCUSED)).toHaveCount(1);
+  });
+
+  test('a Graphviz node routes through the SPA the same way', async ({page}) => {
+    await page.goto('docs/links');
+    await waitForDiagrams(page, 3);
+    await page.evaluate(() => {
+      (window as unknown as {__sameDocument?: boolean}).__sameDocument = true;
+    });
+
+    // `URL=` emits xlink:href, which CSS attribute selectors cannot reach — pick by label.
+    await page
+      .locator('[data-plantuml-diagram]')
+      .nth(1)
+      .locator('svg a')
+      .filter({hasText: 'jump'})
+      .click();
+
+    await expect(page).toHaveURL(/links-target#graph\?highlight-node=TARGET_NODE_7/);
+    await waitForDiagrams(page, 1);
+    await expect(page.locator(FOCUSED)).toHaveCount(1);
+    expect(
+      await page.evaluate(() => (window as unknown as {__sameDocument?: boolean}).__sameDocument),
+    ).toBe(true);
   });
 
   test('a router navigation that drops the hash sweeps the highlight', async ({page}) => {

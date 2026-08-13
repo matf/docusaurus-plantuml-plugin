@@ -20,8 +20,10 @@ router navigation that drops the hash, which must sweep the highlight.
 @startuml
 component "Command handler" as MESSAGE_MY_GREAT_COMMAND
 component "Archive\n12345" as archive
+component "Jump to target page" as JUMP_CROSS [[/docs/links-target#graph?highlight-node=TARGET_NODE_7]]
 note "REACTION-NOTE-1 details" as REACTIONNOTE1
 MESSAGE_MY_GREAT_COMMAND --> archive : stores
+MESSAGE_MY_GREAT_COMMAND --> JUMP_CROSS
 archive .. REACTIONNOTE1
 @enduml
 ```
@@ -34,8 +36,22 @@ digraph G {
   rankdir=LR;
   handler [id="GRAPH-HANDLER-9", label="handler"];
   self    [URL="#graph?highlight-node=SELF-NODE-3", label="self link", fontcolor=blue];
+  jump    [URL="/docs/links-target#graph?highlight-node=TARGET_NODE_7", label="jump", fontcolor=blue];
   docs    [URL="https://graphviz.org/doc/info/attrs.html", label="attrs docs", fontcolor=blue];
   handler -> self;
+  handler -> jump;
   handler -> docs;
 }
+```
+
+Cross-page links work from a standard-library diagram too — the include shifts the engine's
+internal line numbers, so this is what pins the alias-based correlation:
+
+```plantuml title="C4 with a cross-page link"
+@startuml
+!include <C4/C4_Container>
+Person(operator, "Operator")
+Container(webapp, "Web console", "React") [[/docs/links-target#graph?highlight-node=TARGET_NODE_7]]
+Rel(operator, webapp, "Uses")
+@enduml
 ```

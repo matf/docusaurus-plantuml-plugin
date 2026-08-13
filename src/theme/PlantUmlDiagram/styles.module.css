@@ -200,6 +200,30 @@
   text-decoration: underline;
 }
 
+/*
+ * Links inside the picture — Graphviz-native and the anchors synthesized from PlantUML
+ * `[[url]]` links the engine drops. The synthesized ones get the site's link colour so a
+ * linked node is discoverable; Graphviz authors colour their own (`fontcolor=`), so only
+ * the cursor and focus treatment apply there.
+ */
+.canvas svg a {
+  cursor: pointer;
+}
+
+.canvas svg a:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 1px;
+}
+
+.canvas svg a[data-plantuml-diagram-link] text {
+  fill: var(--ifm-link-color);
+}
+
+.canvas svg a[data-plantuml-diagram-link]:hover text,
+.canvas svg a[data-plantuml-diagram-link]:focus-visible text {
+  text-decoration: underline;
+}
+
 .toolbarButton {
   display: flex;
   align-items: center;

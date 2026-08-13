@@ -58,4 +58,6 @@ export const DATA_ATTR = {
   searchCurrent: 'data-plantuml-search-current',
   /** On the node (or its text lines) a `#graph?highlight-node=…` deep link resolved to. */
   focusedNode: 'data-plantuml-focused-node',
+  /** On anchors the plugin synthesized from `[[url]]` links the PlantUML engine dropped. */
+  diagramLink: 'data-plantuml-diagram-link',
 } as const;
