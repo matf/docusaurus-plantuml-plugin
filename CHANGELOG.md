@@ -38,6 +38,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and sweeps every highlight. The figure carries `data-plantuml-search-open="true"` while
   the bar is up.
 
+- **Deep links into diagrams.** A URL hash of the form `#graph?highlight-node=REACTION_1234`
+  focuses a node: every diagram on the page reacts - none needs an id of its own, and a
+  diagram without the node does nothing - the page scrolls to the first matching figure, the
+  node is marked with `data-plantuml-focused-node` and highlighted from the stylesheet, and
+  a zoomable diagram snaps to 100% centred on it. The hash is watched live (`hashchange`),
+  and a `#graph?…` hash defeats lazy loading so below-the-fold targets still react.
+
+  The identifier resolves through a ladder - explicit SVG `id` (Graphviz `node [id="…"]`),
+  the PlantUML alias (`component "X" as REACTION_1234`, aliased notes included, via the
+  `data-qualified-name` the engine writes into its SVG), a self-anchor link
+  (Graphviz `URL="#graph?…"`, which doubles as the node's own permalink when clicked),
+  Graphviz node names via their `<title>`, multiline labels with `%0A`-encoded newlines
+  matched against consecutive text lines within one node's group, and finally a
+  case-insensitive substring of a single line. The first level that matches wins, so a
+  deterministic id always beats loose text matching.
+
+  Alongside this, Graphviz author links are pinned by tests, and sanitization keeps
+  `target="_top"` on links instead of silently dropping it. One engine limitation surfaced
+  and is now documented: the bundled PlantUML engine renders `[[url]]` link text but emits
+  no `<a>` elements, so PlantUML links are not clickable - which is why PlantUML deep-link
+  ids ride on aliases rather than on links.
+
 ### Fixed
 
 - **The rendered SVG is no longer re-parsed on every re-render under React 19.** React 19

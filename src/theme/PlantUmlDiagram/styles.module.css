@@ -169,6 +169,23 @@
   text-decoration: underline;
 }
 
+/*
+ * The node a `#graph?highlight-node=…` deep link resolved to.
+ *
+ * The attribute may sit on a text line itself, or on the group/anchor wrapping a whole node
+ * (Graphviz `g.node`, a PlantUML self-anchor), so both spellings are styled. Scoped to
+ * `.figure` rather than `.layer`: a diagram that opted out of zoom still highlights, it
+ * just cannot pan.
+ *
+ * Placed after the Graphviz `currentColor` retargeting, whose specificity these tie —
+ * source order is what makes the highlight win there.
+ */
+.figure .canvas svg text[data-plantuml-focused-node],
+.figure .canvas svg [data-plantuml-focused-node] text {
+  fill: var(--ifm-color-danger-dark);
+  text-decoration: underline;
+}
+
 .toolbarButton {
   display: flex;
   align-items: center;

@@ -56,4 +56,6 @@ export const DATA_ATTR = {
   searchMatch: 'data-plantuml-search-match',
   /** On the one match the search is currently focused on; always also a `searchMatch`. */
   searchCurrent: 'data-plantuml-search-current',
+  /** On the node (or its text lines) a `#graph?highlight-node=…` deep link resolved to. */
+  focusedNode: 'data-plantuml-focused-node',
 } as const;

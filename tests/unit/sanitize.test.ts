@@ -157,6 +157,54 @@ describe('SVG sanitization preserves legitimate PlantUML output', () => {
   });
 });
 
+describe('plantuml hyperlinks and deeplink anchors', () => {
+  // PlantUML's `[[url]]` on components and notes emits `<a href="…" target="_top">` around
+  // the element's shapes; the deeplink feature additionally rides its target IDs in
+  // hash-only hrefs. These pin that all of it survives sanitization.
+  const wrap = (inner: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">${inner}</svg>`;
+
+  it('keeps a PlantUML-shaped link, including its target', () => {
+    const clean = sanitizeSvgMarkup(
+      wrap('<a href="https://example.com/reactions" target="_top"><rect/><text>C</text></a>'),
+    );
+    const anchor = parse(clean).querySelector('a');
+    expect(anchor?.getAttribute('href')).toBe('https://example.com/reactions');
+    // `target` is not in DOMPurify's SVG profile and is allowed explicitly: PlantUML puts
+    // `_top` on every link it renders, and rewriting where links open is not this
+    // sanitizer's business.
+    expect(anchor?.getAttribute('target')).toBe('_top');
+  });
+
+  it('keeps a hash-only self-anchor, which is how deeplink IDs travel', () => {
+    const clean = sanitizeSvgMarkup(
+      wrap('<a href="#graph?highlight-node=REACTION-1234" target="_top"><text>N</text></a>'),
+    );
+    expect(parse(clean).querySelector('a')?.getAttribute('href')).toBe(
+      '#graph?highlight-node=REACTION-1234',
+    );
+  });
+
+  it('keeps element ids, which the deeplink matcher resolves first', () => {
+    const clean = sanitizeSvgMarkup(
+      wrap(
+        '<g id="MESSAGE-MY-GREAT-COMMAND" class="node"><title>archive</title><text>t</text></g>',
+      ),
+    );
+    const group = parse(clean).querySelector('g');
+    expect(group?.getAttribute('id')).toBe('MESSAGE-MY-GREAT-COMMAND');
+    expect(group?.getAttribute('class')).toBe('node');
+    expect(group?.querySelector('title')?.textContent).toBe('archive');
+  });
+
+  it('still strips a javascript: URL even with a target attribute present', () => {
+    const clean = sanitizeSvgMarkup(
+      wrap('<a href="javascript:alert(1)" target="_top"><text>x</text></a>'),
+    );
+    expect(clean).not.toMatch(/javascript:/i);
+  });
+});
+
 describe('graphviz hyperlinks', () => {
   // DOT's `URL=`/`href=` node and edge attributes emit real <a> elements into the SVG, and
   // diagram source is untrusted by this plugin's threat model. These pin the guarantee.

@@ -42,7 +42,11 @@ export function sanitizeSvgMarkup(svg: string): string {
     USE_PROFILES: {svg: true, svgFilters: true},
     FORBID_TAGS: FORBIDDEN_TAGS,
     FORBID_ATTR: ['formaction', 'xlink:show', 'ping'],
-    ADD_ATTR: ['role', 'aria-label', 'aria-labelledby', 'aria-describedby'],
+    // `target` is in DOMPurify's HTML profile but not its SVG profile, and PlantUML puts
+    // `target="_top"` on every `[[link]]` it renders. The attribute carries no script
+    // surface — modern browsers imply `noopener` for `target="_blank"` — so it is allowed
+    // rather than silently rewriting where the author's links open.
+    ADD_ATTR: ['role', 'aria-label', 'aria-labelledby', 'aria-describedby', 'target'],
     ALLOW_DATA_ATTR: true,
     KEEP_CONTENT: true,
     RETURN_DOM: false,

@@ -691,6 +691,63 @@ before either feature existed.
 This is separate from `showSourceOnError`, which offers the source in the error panel when a
 diagram _fails_ to render.
 
+## Links and deep links
+
+### Links written in the diagram source
+
+**Graphviz** emits real hyperlinks: `URL=`/`href=` on a node or edge becomes an `<a>` in the
+rendered SVG, preserved through sanitization (`javascript:` URLs are stripped). Links stay
+clickable inside the zoomable viewport: a plain click follows the link, while a click that
+ends a drag does not.
+
+````markdown
+```dot
+digraph { docs [URL="https://graphviz.org/doc/info/attrs.html"]; }
+```
+````
+
+**PlantUML** links are an engine limitation today: the bundled browser engine renders
+`[[url]]` link _text_ (styled blue and underlined) but emits no `<a>` elements, so PlantUML
+links are not clickable. Deep-link addressing does not depend on them - PlantUML nodes are
+addressed by alias, below. Should the engine gain anchor output, links will pass through
+sanitization unchanged (that path is pinned by tests, `target="_top"` included).
+
+### Deep links: `#graph?highlight-node=…`
+
+A URL hash of the form `#graph?highlight-node=REACTION_1234` focuses a node:
+
+- **Every diagram on the page reacts** - no diagram needs an id of its own. A diagram that
+  does not contain the node simply does nothing.
+- The page scrolls to the first matching figure, the node is visibly highlighted
+  (`data-plantuml-focused-node`, restylable from site CSS), and a zoomable diagram snaps to
+  **100% centred on the node**. The highlight stays until the hash changes.
+- The hash is watched live, so following a `#graph?…` link anywhere on the page - including
+  one inside a Graphviz diagram - focuses the node without a reload.
+- A `#graph?…` hash defeats lazy loading for the page's diagrams, so a target below the
+  fold still reacts. That costs the render of every diagram on the page, exactly as
+  `lazy: false` would.
+
+The identifier is resolved per diagram through a ladder; the first level that matches wins:
+
+| #   | Level             | Works in | Authoring                                                                                                                               |
+| --- | ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Explicit SVG `id` | Graphviz | `node [id="REACTION-1234"]`                                                                                                             |
+| 2   | PlantUML alias    | PlantUML | `component "X" as REACTION_1234`, `note "…" as REACTION_1234` - the alias lands in the SVG as `data-qualified-name`                     |
+| 3   | Self-anchor link  | Graphviz | `node [URL="#graph?highlight-node=REACTION-1234"]` - carries the id _and_, being a real link, clicking the node mints its own permalink |
+| 4   | Node name         | Graphviz | plain DOT node names, via the `<title>` Graphviz emits                                                                                  |
+| 5   | Multiline label   | both     | `%0A` encodes the newline: `#graph?highlight-node=Archive%0A12345` matches _consecutive_ label lines, kept within one node's group      |
+| 6   | Substring         | both     | any text line containing the identifier, case-insensitively                                                                             |
+
+Level 2 is the PlantUML spelling of a hidden, deterministic id: the alias never appears in
+the picture, but the engine writes it onto the entity's group - and aliased **notes** get
+one too, so `note "…" as MYNOTE_123` makes the note itself navigable. PlantUML aliases are
+identifiers: use underscores (`REACTION_1234`), not hyphens, which do not parse.
+
+Level 6 is what makes an unannotated node reachable by the unique part of its label - for a
+node labelled `caminus-process-archive\n12345`, the hash `#graph?highlight-node=12345`
+suffices. Levels 1-4 exist so that a deterministic, author-chosen identifier always beats
+loose text matching.
+
 ## Lazy loading
 
 With `lazy: true` (the default), a diagram is not rendered until it scrolls within 300 px of
@@ -1192,6 +1249,10 @@ package.
 - **Diagrams are not rendered during static-site generation.** The HTML Docusaurus emits
   contains the deferred placeholder and the `<noscript>` source. Search engines that do not
   execute JavaScript will not see the diagram image.
+- **PlantUML `[[url]]` hyperlinks are not clickable.** The bundled browser engine renders
+  the link text (styled blue and underlined) but emits no `<a>` elements into its SVG.
+  Graphviz links work; PlantUML deep-link addressing works through aliases and does not
+  need links. See [Links and deep links](#links-and-deep-links).
 - **One PlantUML diagram renders at a time.** The PlantUML engine has module-level shared
   state, so a page with many large diagrams renders them sequentially. This is a correctness
   requirement, not a tuning knob. Graphviz has no such constraint and is not queued.

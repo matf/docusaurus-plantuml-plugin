@@ -31,7 +31,9 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from './icons.js';
+import {parseDiagramHash} from './deeplink.js';
 import Minimap from './Minimap.js';
+import {useDiagramDeeplink} from './useDiagramDeeplink.js';
 import {useDiagramSearch} from './useDiagramSearch.js';
 import {useZoomPan} from './useZoomPan.js';
 import styles from './styles.module.css';
@@ -146,7 +148,14 @@ export default function PlantUmlDiagram({
   const sourceAvailable = showSourceProp ?? config?.options.showSource ?? true;
 
   const [state, setState] = useState<RenderState>(INITIAL_STATE);
-  const [inView, setInView] = useState(!lazy);
+  // A diagram deep link must be able to reach a diagram below the fold, so a `#graph?…`
+  // hash defeats lazy rendering. The initializer never runs during SSR (window is
+  // undefined there), and the first paint is the placeholder either way, so hydration
+  // cannot mismatch.
+  const [inView, setInView] = useState(
+    () =>
+      !lazy || (typeof window !== 'undefined' && parseDiagramHash(window.location.hash) !== null),
+  );
   const [sourceOpen, setSourceOpen] = useState(false);
   const [minimapOpen, setMinimapOpen] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>('idle');
@@ -199,6 +208,25 @@ export default function PlantUmlDiagram({
     zoom,
     svg: state.svg,
   });
+
+  useDiagramDeeplink({
+    ready: state.status === 'ready' && state.svg !== null,
+    svg: state.svg,
+    interactive,
+    zoom,
+    containerRef,
+  });
+
+  // A hash arriving *after* mount must defeat lazy rendering too — a deep link followed
+  // from another diagram on the same page may point below the fold.
+  useEffect(() => {
+    if (inView) return undefined;
+    const onHashChange = () => {
+      if (parseDiagramHash(window.location.hash) !== null) setInView(true);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [inView]);
 
   const searchToggleRef = useRef<HTMLButtonElement | null>(null);
 
