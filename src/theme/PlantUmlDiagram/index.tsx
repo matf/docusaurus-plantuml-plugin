@@ -13,11 +13,13 @@ import {
   CloseIcon,
   FitIcon,
   MaximizeIcon,
+  MinimapIcon,
   ResetZoomIcon,
   SourceIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from './icons.js';
+import Minimap from './Minimap.js';
 import {useZoomPan} from './useZoomPan.js';
 import styles from './styles.module.css';
 
@@ -133,6 +135,7 @@ export default function PlantUmlDiagram({
   const [state, setState] = useState<RenderState>(INITIAL_STATE);
   const [inView, setInView] = useState(!lazy);
   const [sourceOpen, setSourceOpen] = useState(false);
+  const [minimapOpen, setMinimapOpen] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -369,6 +372,7 @@ export default function PlantUmlDiagram({
         ...(interactive ? {[DATA_ATTR.interactive]: 'true'} : {}),
         ...(zoom.maximized ? {[DATA_ATTR.maximized]: 'true'} : {}),
         ...(sourceOpen ? {[DATA_ATTR.sourceOpen]: 'true'} : {}),
+        ...(minimapOpen ? {[DATA_ATTR.minimapOpen]: 'true'} : {}),
       }}
     >
       {/*
@@ -507,6 +511,28 @@ export default function PlantUmlDiagram({
               100%
             </span>
           </div>
+
+          {/*
+           * Bottom-left, mirroring the toolbar's top-right: the minimap toggle, with the map
+           * itself above it while open. Both disappear with the picture when the source view
+           * is flipped on — a map of an invisible diagram would pan nothing anyone can see.
+           */}
+          {!sourceOpen && minimapOpen && (
+            <Minimap svg={state.svg} zoom={zoom} onClose={() => setMinimapOpen(false)} />
+          )}
+          {!sourceOpen && (
+            <div className={styles.minimapBar}>
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label={minimapOpen ? 'Hide minimap' : 'Show minimap'}
+                aria-expanded={minimapOpen}
+                onClick={() => setMinimapOpen((open) => !open)}
+              >
+                <MinimapIcon />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

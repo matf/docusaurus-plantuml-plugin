@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Maximize, is drawn as inline SVG like the rest of the toolbar, and carries
   `aria-label="Fit diagram to view"`.
 
+- **A minimap.** A new toggle in the bottom-left corner opens a small copy of the diagram
+  with a rectangle marking what the viewport currently shows; pressing or dragging anywhere
+  on the map centres the view there, so a single press doubles as "jump there". The map
+  follows every zoom, pan and resize without re-rendering the figure — it subscribes to the
+  same imperative transform writes the zoom hook itself uses — and works while maximized.
+  The figure carries `data-plantuml-minimap-open="true"` while the map is up.
+
+  The map is pointer-only and hidden from assistive technology on purpose: the real viewport
+  is already keyboard-operable, so a second, duplicated view of the same diagram would add
+  noise without adding a capability. Its close button stays outside the hidden subtree and
+  remains focusable.
+
 ## [1.3.1]
 
 ### Fixed

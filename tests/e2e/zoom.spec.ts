@@ -374,6 +374,43 @@ test.describe('zoom and pan', () => {
     await page.keyboard.press('Escape');
   });
 
+  test('the minimap pans the diagram and closes from its own button', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    await figure.getByRole('button', {name: 'Show minimap'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-minimap-open', 'true');
+
+    const map = figure.locator('[data-plantuml-minimap]');
+    await expect(map).toBeVisible();
+    // The map carries a scaled copy of the diagram, hidden from assistive technology.
+    await expect(map.locator('div[aria-hidden="true"] svg').first()).toBeVisible();
+
+    // Zoom in so only part of the diagram is visible; the map is what brings the rest back.
+    const zoomIn = figure.getByRole('button', {name: 'Zoom in'});
+    for (let i = 0; i < 4; i += 1) await zoomIn.click();
+    await expect.poll(() => zoomLevel(page)).toBeGreaterThan(2);
+
+    // Button zoom anchors top-left, so the view sits at the top-left; pressing near the
+    // bottom-right of the map must pan the layer up and left.
+    const canvas = map.locator('div[aria-hidden="true"]').first();
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('minimap canvas has no box');
+    const layer = layerOf(figure);
+    const before = await rectOf(layer);
+
+    await page.mouse.move(box.x + box.width - 4, box.y + box.height - 4);
+    await page.mouse.down();
+    await page.mouse.up();
+
+    await expect.poll(async () => (await rectOf(layer)).x).toBeLessThan(before.x);
+
+    await figure.getByRole('button', {name: 'Close minimap'}).click();
+    await expect(map).toHaveCount(0);
+    await expect(figure).not.toHaveAttribute('data-plantuml-minimap-open', 'true');
+  });
+
   test('does not interfere with ordinary diagram pages', async ({page}) => {
     const seen = monitor(page, ORIGIN);
     await page.goto('docs/multiple-diagrams');

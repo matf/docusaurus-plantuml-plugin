@@ -48,4 +48,6 @@ export const DATA_ATTR = {
   maximized: 'data-plantuml-maximized',
   /** `"true"` on the figure while the source panel is open. */
   sourceOpen: 'data-plantuml-source-open',
+  /** `"true"` on the figure while the minimap is open. */
+  minimapOpen: 'data-plantuml-minimap-open',
 } as const;

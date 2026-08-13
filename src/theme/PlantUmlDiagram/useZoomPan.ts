@@ -55,6 +55,20 @@ export interface ZoomPanHandle {
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
   /** Whether the diagram currently fills the browser viewport. */
   maximized: boolean;
+  /** Reads the live transform without subscribing to it. */
+  getTransform: () => Transform;
+  /** Applies a transform through the same clamp as every gesture. */
+  applyTransform: (next: Transform) => void;
+  /** Layout sizes of the viewport and content — the bounds the clamp runs against. */
+  measure: () => Bounds;
+  /**
+   * Calls the listener after every committed transform write; returns the unsubscribe.
+   *
+   * This is how the minimap tracks the view: the transform is written straight to the DOM on
+   * every pan frame, so anything that mirrored it through React state would re-render the
+   * component once per frame.
+   */
+  subscribe: (listener: (transform: Transform) => void) => () => void;
 }
 
 export interface UseZoomPanParams {
@@ -74,6 +88,7 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
 
   const [maximized, setMaximized] = useState(false);
   const transformRef = useRef<Transform>(IDENTITY);
+  const listenersRef = useRef<Set<(transform: Transform) => void>>(new Set());
   /** The view to restore when the diagram is un-maximized. */
   const beforeMaximizeRef = useRef<Transform | null>(null);
   const frameRef = useRef<number | null>(null);
@@ -101,7 +116,17 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     if (viewport) viewport.dataset['plantumlZoom'] = formatZoom(next.k);
     const readout = readoutRef.current;
     if (readout) readout.textContent = formatPercent(next.k);
+    for (const listener of listenersRef.current) listener(next);
   }, []);
+
+  const subscribe = useCallback((listener: (transform: Transform) => void) => {
+    listenersRef.current.add(listener);
+    return () => {
+      listenersRef.current.delete(listener);
+    };
+  }, []);
+
+  const getTransform = useCallback(() => transformRef.current, []);
 
   const apply = useCallback(
     (next: Transform) => {
@@ -416,6 +441,10 @@ export function useZoomPan({enabled, resetKey}: UseZoomPanParams): ZoomPanHandle
     toggleMaximize,
     onKeyDown,
     maximized,
+    getTransform,
+    applyTransform: apply,
+    measure,
+    subscribe,
   };
 }
 

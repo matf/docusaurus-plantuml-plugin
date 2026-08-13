@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 
 import {
+  centerViewportOn,
   clamp,
   clampTransform,
   fitScale,
@@ -10,10 +11,12 @@ import {
   isIdentity,
   MAX_SCALE,
   MIN_SCALE,
+  minimapScale,
   normalizeWheelDelta,
   panBy,
   SCALE_STEP,
   toCssTransform,
+  visibleContentRect,
   wheelZoomFactor,
   zoomAbout,
   type Bounds,
@@ -241,6 +244,101 @@ describe('fitScale', () => {
 
   it('falls back to 1 when nothing has been measured', () => {
     expect(fitScale({...viewport, contentWidth: 0, contentHeight: 0})).toBe(1);
+  });
+});
+
+describe('minimapScale', () => {
+  it('fits wide content into the box', () => {
+    expect(
+      minimapScale(
+        {viewportWidth: 0, viewportHeight: 0, contentWidth: 800, contentHeight: 300},
+        200,
+        150,
+      ),
+    ).toBeCloseTo(0.25, 9);
+  });
+
+  it('uses the more constraining axis', () => {
+    expect(
+      minimapScale(
+        {viewportWidth: 0, viewportHeight: 0, contentWidth: 400, contentHeight: 600},
+        200,
+        150,
+      ),
+    ).toBeCloseTo(0.25, 9);
+  });
+
+  it('never magnifies a small diagram into a blurrier copy of itself', () => {
+    expect(
+      minimapScale(
+        {viewportWidth: 0, viewportHeight: 0, contentWidth: 100, contentHeight: 50},
+        200,
+        150,
+      ),
+    ).toBe(1);
+  });
+
+  it('returns 0 when nothing has been measured, meaning "no minimap"', () => {
+    expect(
+      minimapScale(
+        {viewportWidth: 0, viewportHeight: 0, contentWidth: 0, contentHeight: 0},
+        200,
+        150,
+      ),
+    ).toBe(0);
+  });
+});
+
+describe('visibleContentRect', () => {
+  const bounds: Bounds = {
+    viewportWidth: 400,
+    viewportHeight: 300,
+    contentWidth: 800,
+    contentHeight: 600,
+  };
+
+  it('reports the viewport footprint at 100%', () => {
+    expect(visibleContentRect(IDENTITY, bounds)).toEqual({x: 0, y: 0, width: 400, height: 300});
+  });
+
+  it('shrinks the footprint as the zoom grows', () => {
+    const rect = visibleContentRect({k: 2, x: -400, y: -300}, bounds);
+    expect(rect).toEqual({x: 200, y: 150, width: 200, height: 150});
+  });
+
+  it('covers the whole content when everything fits', () => {
+    const rect = visibleContentRect({k: 0.25, x: 0, y: 0}, bounds);
+    expect(rect).toEqual({x: 0, y: 0, width: 800, height: 600});
+  });
+
+  it('never pokes outside the content, even mid-gesture', () => {
+    const rect = visibleContentRect({k: 2, x: 400, y: -20000}, bounds);
+    expect(rect.x).toBe(0);
+    expect(rect.y + rect.height).toBeLessThanOrEqual(600);
+  });
+});
+
+describe('centerViewportOn', () => {
+  const bounds: Bounds = {
+    viewportWidth: 400,
+    viewportHeight: 300,
+    contentWidth: 800,
+    contentHeight: 600,
+  };
+
+  it('puts the requested content point at the viewport centre', () => {
+    const transform = centerViewportOn({k: 2, x: 0, y: 0}, 300, 200, bounds);
+    expect(project(transform, 300, 200)).toEqual({x: 200, y: 150});
+  });
+
+  it('keeps the scale', () => {
+    expect(centerViewportOn({k: 1.25, x: -40, y: 12}, 100, 100, bounds).k).toBe(1.25);
+  });
+
+  it('is deliberately unclamped, leaving edge-pinning to the shared clamp', () => {
+    const transform = centerViewportOn(IDENTITY, 0, 0, bounds);
+    expect(transform).toEqual({k: 1, x: 200, y: 150});
+    expect(clampTransform(transform, bounds)).toEqual(IDENTITY);
   });
 });
 

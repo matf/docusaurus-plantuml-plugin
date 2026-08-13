@@ -93,6 +93,16 @@ export function CloseIcon(): ReactElement {
   );
 }
 
+/** The minimap toggle: a map frame with the viewport rectangle marked inside it. */
+export function MinimapIcon(): ReactElement {
+  return (
+    <svg {...iconProps}>
+      <rect x="2" y="3" width="12" height="10" rx="1" />
+      <rect x="4.5" y="7.5" width="4" height="3" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 /**
  * Replaces the literal `</>` of the source toggle.
  *

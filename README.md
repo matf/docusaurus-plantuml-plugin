@@ -570,6 +570,17 @@ space instead and keeps it visible as long as possible.
 Scale is limited to 0.25×–8×, and the view resets to 100% whenever the diagram source or the
 site colour mode changes.
 
+### Minimap
+
+The button in the bottom-left corner opens a minimap: a small copy of the diagram with a
+rectangle marking what the viewport currently shows. Press or drag anywhere on the map to
+centre the view there — a single press works as "jump there". The map follows every zoom,
+pan and resize, works while maximized, and closes from its own ✕ or the toggle.
+
+The map is pointer-only and hidden from assistive technology on purpose: the real viewport is
+already keyboard-operable with the arrow keys, so announcing a second, duplicated view of the
+same diagram would add noise without adding a capability.
+
 ### Maximizing
 
 The maximize button expands the diagram to fill the browser viewport, fitted to the
