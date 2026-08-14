@@ -58,4 +58,22 @@ export function resetStubRouter(): void {
   current = INITIAL;
   navigationCount = 0;
   listeners.clear();
+  historyPushes.length = 0;
+}
+
+/** Every path handed to `history.push`, oldest first — what a test asserts against. */
+export const historyPushes: string[] = [];
+
+/** Mirrors `useHistory().push`: records the target and performs the navigation. */
+export function useHistory(): {push: (to: string) => void} {
+  return {
+    push: (to: string) => {
+      historyPushes.push(to);
+      const hashIndex = to.indexOf('#');
+      setStubLocation({
+        pathname: hashIndex >= 0 ? to.slice(0, hashIndex) : to,
+        hash: hashIndex >= 0 ? to.slice(hashIndex) : '',
+      });
+    },
+  };
 }

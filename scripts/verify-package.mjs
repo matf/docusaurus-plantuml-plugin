@@ -28,8 +28,15 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const MAX_UNPACKED_BYTES = 4 * 1024 * 1024;
 const MAX_PACKED_BYTES = 1024 * 1024;
 
-/** The compiled plugin on its own, with the vendored standard library set aside. */
-const MAX_CODE_UNPACKED_BYTES = 400 * 1024;
+/**
+ * The compiled plugin on its own, with the vendored standard library set aside.
+ *
+ * Raised from 400 KiB for 1.5.0: the viewer-navigation features (fit, minimap, search,
+ * deep links, link synthesis) and their documentation crossed the old line by 2 KiB.
+ * The budget still exists to catch *accidental* bloat — a vendored dependency, a stray
+ * asset — so keep raises deliberate, small, and tied to a release like this one.
+ */
+const MAX_CODE_UNPACKED_BYTES = 448 * 1024;
 
 const REQUIRED_FILES = [
   'dist/index.js',

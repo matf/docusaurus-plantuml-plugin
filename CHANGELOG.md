@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-14
+
+### Added
+
+- **Deep links *from* diagram nodes — including to diagrams on other pages.** A node can now
+  carry a link to another diagram's deep link, and clicking it navigates there and focuses
+  the target node: `component "Order Service" as ORDER_SVC
+  [[/docs/orders#graph?highlight-node=ORDER_DETAIL_1]]` in PlantUML, or
+  `orders [URL="/docs/orders#graph?highlight-node=ORDER_DETAIL_1"]` in Graphviz.
+
+  For PlantUML this means the plugin now **synthesizes the anchors the bundled engine
+  drops**: `[[url]]` on components, participants, C4 macros and relations is read back out
+  of the fence source and wrapped around the rendered element — clickable,
+  keyboard-focusable, marked `data-plantuml-diagram-link`, coloured with the site's link
+  colour. Correlation runs on the alias the engine writes into `data-qualified-name`, with
+  `data-source-line` as the fallback, so it survives `!include` — standard-library diagrams
+  included, whose preprocessing shifts every line number. Synthesized hrefs pass a scheme
+  allowlist; a link that cannot be correlated attaches to nothing. Links inside note bodies
+  remain the engine's styled-but-inert text, and one link per source line is correlatable.
+
+  Navigation is SPA-aware in both engines: in-diagram links to same-site URLs go through
+  the Docusaurus router — no full page load — and site-absolute paths get the site's
+  `baseUrl` exactly as markdown links do. External links and pure `#…` anchors stay native,
+  and clicks that end a drag never navigate.
+
+### Changed
+
+- **The deep-link highlight is green, not red.** The focused-node colour was the theme's
+  danger red, which reads as an error on a highlight that persists until the hash changes;
+  it now defaults to the theme's success green. Sites can pick any colour by setting
+  `--plantuml-focus-color` — the rule reads
+  `var(--plantuml-focus-color, var(--ifm-color-success))`.
+
 ## [1.4.0] - 2026-08-13
 
 ### Added
@@ -449,7 +482,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.2.0...v1.3.0

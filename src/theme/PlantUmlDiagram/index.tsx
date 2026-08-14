@@ -35,6 +35,7 @@ import {
 import {parseDiagramHash} from './deeplink.js';
 import Minimap from './Minimap.js';
 import {useDiagramDeeplink} from './useDiagramDeeplink.js';
+import {useDiagramLinks} from './useDiagramLinks.js';
 import {useDiagramSearch} from './useDiagramSearch.js';
 import {useZoomPan} from './useZoomPan.js';
 import styles from './styles.module.css';
@@ -216,6 +217,14 @@ export default function PlantUmlDiagram({
     svg: state.svg,
     interactive,
     zoom,
+    containerRef,
+  });
+
+  useDiagramLinks({
+    ready: state.status === 'ready' && state.svg !== null,
+    svg: state.svg,
+    engine,
+    source,
     containerRef,
   });
 

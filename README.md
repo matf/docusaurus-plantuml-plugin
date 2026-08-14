@@ -697,24 +697,86 @@ diagram _fails_ to render.
 
 ## Links and deep links
 
-### Links written in the diagram source
+### Linking from a node
 
-**Graphviz** emits real hyperlinks: `URL=`/`href=` on a node or edge becomes an `<a>` in the
-rendered SVG, preserved through sanitization (`javascript:` URLs are stripped). Links stay
-clickable inside the zoomable viewport: a plain click follows the link, while a click that
-ends a drag does not.
+A node (or edge) can carry a link — to an external site, another docs page, or another
+diagram's node via a [deep link](#deep-links-graphhighlight-node). What to write differs by
+engine.
+
+#### PlantUML
+
+**Recommended form — give the node an alias** and put the link on the same line:
 
 ````markdown
-```dot
-digraph { docs [URL="https://graphviz.org/doc/info/attrs.html"]; }
+```plantuml
+@startuml
+component "Order Service" as ORDER_SVC [[/docs/orders#graph?highlight-node=ORDER_DETAIL_1]]
+
+' The same through a C4 macro — the alias is the macro's first argument:
+!include <C4/C4_Container>
+Container(billing, "Billing", "Java") [[/docs/billing#graph?highlight-node=INVOICE_QUEUE]]
+@enduml
 ```
 ````
 
-**PlantUML** links are an engine limitation today: the bundled browser engine renders
-`[[url]]` link _text_ (styled blue and underlined) but emits no `<a>` elements, so PlantUML
-links are not clickable. Deep-link addressing does not depend on them - PlantUML nodes are
-addressed by alias, below. Should the engine gain anchor output, links will pass through
-sanitization unchanged (that path is pinned by tests, `target="_top"` included).
+The bundled engine parses `[[url]]` but emits no `<a>` elements, so the plugin
+**synthesizes** the anchor: it reads the link back out of the fence source and wraps the
+rendered element in a real anchor — clickable, keyboard-focusable, coloured with the site's
+link colour, underlined on hover, and marked `data-plantuml-diagram-link` for site CSS. The
+alias is the correlation key (the engine writes it into the SVG as `data-qualified-name`),
+which is what makes this form work in **every** diagram — including ones whose
+`!include <…>` shifts the engine's internal line numbering.
+
+**Fallback form — no alias.** A plain quoted declaration or an edge label also works:
+
+````markdown
+```plantuml
+@startuml
+component "Order Service" [[/docs/orders#graph?highlight-node=ORDER_DETAIL_1]]
+"Order Service" --> "Billing" : invoices [[/docs/billing]]
+@enduml
+```
+````
+
+With nothing alias-shaped on the line, the plugin correlates by the line number the engine
+stamps on each element (`data-source-line`) — which is exact **only in diagrams without
+`!include`**. In a standard-library diagram these links attach to nothing; use the aliased
+form there.
+
+Boundaries, by design: hrefs pass a scheme allowlist (`http(s)`, site-relative, `#…` —
+anything else is dropped); links inside _note bodies_ stay the styled-but-inert text the
+engine renders; one link per source line is correlatable; and a link that cannot be
+correlated attaches to nothing rather than to the wrong node.
+
+#### Graphviz
+
+One form, no fallback involved — the engine emits the anchor itself, preserved through
+sanitization (`javascript:` URLs are stripped):
+
+````markdown
+```dot
+digraph {
+  orders [URL="/docs/orders#graph?highlight-node=ORDER_DETAIL_1", label="Order Service", fontcolor=blue];
+}
+```
+````
+
+#### How clicks navigate
+
+Both engines share the same navigation behaviour: a click on an in-diagram link to a
+same-site URL goes through the Docusaurus router — no full page load — and site-absolute
+paths get the site's `baseUrl` exactly as markdown links do, so `/docs/orders` means the
+same thing in a diagram as in prose. External links and pure `#…` anchors stay native,
+modified clicks (Ctrl, Cmd, Shift) keep the browser's own behaviour, and a click that ends
+a drag never navigates.
+
+Clicking either example node above therefore navigates — without a reload — to
+`/docs/orders`, where the diagram containing `ORDER_DETAIL_1` highlights and centres it.
+
+**Rule of thumb: in PlantUML, give a node an alias if you link it or link to it.** The
+aliased spelling is immune to includes on both ends — as the outgoing link's correlation
+key here, and as the incoming deep link's `data-qualified-name` target below. The
+unaliased form exists so quick, plain diagrams work without ceremony.
 
 ### Deep links: `#graph?highlight-node=…`
 
@@ -723,8 +785,16 @@ A URL hash of the form `#graph?highlight-node=REACTION_1234` focuses a node:
 - **Every diagram on the page reacts** - no diagram needs an id of its own. A diagram that
   does not contain the node simply does nothing.
 - The page scrolls to the first matching figure, the node is visibly highlighted
-  (`data-plantuml-focused-node`, restylable from site CSS), and a zoomable diagram snaps to
-  **100% centred on the node**. The highlight stays until the hash changes.
+  (`data-plantuml-focused-node`), and a zoomable diagram snaps to **100% centred on the
+  node**. The highlight stays until the hash changes. It uses the theme's success green by
+  default; set `--plantuml-focus-color` in site CSS to pick any other colour:
+
+  ```css
+  :root {
+    --plantuml-focus-color: #3578e5; /* a light blue instead */
+  }
+  ```
+
 - The hash is watched live, so following a `#graph?…` link anywhere on the page - including
   one inside a Graphviz diagram - focuses the node without a reload.
 - A `#graph?…` hash defeats lazy loading for the page's diagrams, so a target below the
@@ -1253,10 +1323,11 @@ package.
 - **Diagrams are not rendered during static-site generation.** The HTML Docusaurus emits
   contains the deferred placeholder and the `<noscript>` source. Search engines that do not
   execute JavaScript will not see the diagram image.
-- **PlantUML `[[url]]` hyperlinks are not clickable.** The bundled browser engine renders
-  the link text (styled blue and underlined) but emits no `<a>` elements into its SVG.
-  Graphviz links work; PlantUML deep-link addressing works through aliases and does not
-  need links. See [Links and deep links](#links-and-deep-links).
+- **PlantUML links inside note bodies are not clickable.** The plugin synthesizes the
+  `[[url]]` anchors the bundled engine drops on components, participants, macros and
+  relations — but a link in a note's _text_ renders as the styled-but-inert text the engine
+  emits, with nothing to correlate it to. One link per source line is correlatable, for the
+  same reason. See [Links and deep links](#links-and-deep-links).
 - **One PlantUML diagram renders at a time.** The PlantUML engine has module-level shared
   state, so a page with many large diagrams renders them sequentially. This is a correctness
   requirement, not a tuning knob. Graphviz has no such constraint and is not queued.
