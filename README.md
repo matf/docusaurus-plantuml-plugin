@@ -697,44 +697,86 @@ diagram _fails_ to render.
 
 ## Links and deep links
 
-### Links written in the diagram source
+### Linking from a node
 
-**Graphviz** emits real hyperlinks: `URL=`/`href=` on a node or edge becomes an `<a>` in the
-rendered SVG, preserved through sanitization (`javascript:` URLs are stripped).
+A node (or edge) can carry a link — to an external site, another docs page, or another
+diagram's node via a [deep link](#deep-links-graphhighlight-node). What to write differs by
+engine.
 
-**PlantUML** `[[url]]` links on components, participants, C4 macros and relations are
-**synthesized by the plugin**: the bundled engine parses them but emits no `<a>` elements,
-so the plugin reads them back out of the fence source and wraps the rendered element in a
-real anchor - clickable, keyboard-focusable, coloured with the site's link colour, and
-underlined on hover. Correlation runs on the alias the engine writes into its SVG
-(`data-qualified-name`), with the engine's `data-source-line` as a fallback, so it survives
-`!include` - standard-library diagrams included, whose preprocessing shifts every line
-number. Synthesized hrefs pass a scheme allowlist (`http(s)`, site-relative, `#…`); anything
-else is dropped. Two limitations: links inside _note bodies_ stay the styled-but-inert text
-the engine renders, and one link per source line is correlatable.
+#### PlantUML
 
-**Navigation** is SPA-aware in both engines: a click on an in-diagram link to a same-site
-URL goes through the Docusaurus router - no full page load - and site-absolute paths get
-the site's `baseUrl` exactly as markdown links do, so `/docs/orders` means the same thing
-in a diagram as in prose. External links and pure `#…` anchors stay native, and clicks
-that end a drag never navigate.
-
-Node-to-diagram navigation follows from the two halves together:
+**Recommended form — give the node an alias** and put the link on the same line:
 
 ````markdown
 ```plantuml
 @startuml
 component "Order Service" as ORDER_SVC [[/docs/orders#graph?highlight-node=ORDER_DETAIL_1]]
-@enduml
-```
 
-```dot
-digraph { orders [URL="/docs/orders#graph?highlight-node=ORDER_DETAIL_1"]; }
+' The same through a C4 macro — the alias is the macro's first argument:
+!include <C4/C4_Container>
+Container(billing, "Billing", "Java") [[/docs/billing#graph?highlight-node=INVOICE_QUEUE]]
+@enduml
 ```
 ````
 
-Clicking either node navigates - without a reload - to `/docs/orders`, where the diagram
-containing `ORDER_DETAIL_1` highlights and centres it.
+The bundled engine parses `[[url]]` but emits no `<a>` elements, so the plugin
+**synthesizes** the anchor: it reads the link back out of the fence source and wraps the
+rendered element in a real anchor — clickable, keyboard-focusable, coloured with the site's
+link colour, underlined on hover, and marked `data-plantuml-diagram-link` for site CSS. The
+alias is the correlation key (the engine writes it into the SVG as `data-qualified-name`),
+which is what makes this form work in **every** diagram — including ones whose
+`!include <…>` shifts the engine's internal line numbering.
+
+**Fallback form — no alias.** A plain quoted declaration or an edge label also works:
+
+````markdown
+```plantuml
+@startuml
+component "Order Service" [[/docs/orders#graph?highlight-node=ORDER_DETAIL_1]]
+"Order Service" --> "Billing" : invoices [[/docs/billing]]
+@enduml
+```
+````
+
+With nothing alias-shaped on the line, the plugin correlates by the line number the engine
+stamps on each element (`data-source-line`) — which is exact **only in diagrams without
+`!include`**. In a standard-library diagram these links attach to nothing; use the aliased
+form there.
+
+Boundaries, by design: hrefs pass a scheme allowlist (`http(s)`, site-relative, `#…` —
+anything else is dropped); links inside _note bodies_ stay the styled-but-inert text the
+engine renders; one link per source line is correlatable; and a link that cannot be
+correlated attaches to nothing rather than to the wrong node.
+
+#### Graphviz
+
+One form, no fallback involved — the engine emits the anchor itself, preserved through
+sanitization (`javascript:` URLs are stripped):
+
+````markdown
+```dot
+digraph {
+  orders [URL="/docs/orders#graph?highlight-node=ORDER_DETAIL_1", label="Order Service", fontcolor=blue];
+}
+```
+````
+
+#### How clicks navigate
+
+Both engines share the same navigation behaviour: a click on an in-diagram link to a
+same-site URL goes through the Docusaurus router — no full page load — and site-absolute
+paths get the site's `baseUrl` exactly as markdown links do, so `/docs/orders` means the
+same thing in a diagram as in prose. External links and pure `#…` anchors stay native,
+modified clicks (Ctrl, Cmd, Shift) keep the browser's own behaviour, and a click that ends
+a drag never navigates.
+
+Clicking either example node above therefore navigates — without a reload — to
+`/docs/orders`, where the diagram containing `ORDER_DETAIL_1` highlights and centres it.
+
+**Rule of thumb: in PlantUML, give a node an alias if you link it or link to it.** The
+aliased spelling is immune to includes on both ends — as the outgoing link's correlation
+key here, and as the incoming deep link's `data-qualified-name` target below. The
+unaliased form exists so quick, plain diagrams work without ceremony.
 
 ### Deep links: `#graph?highlight-node=…`
 
