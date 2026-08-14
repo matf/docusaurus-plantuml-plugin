@@ -785,8 +785,16 @@ A URL hash of the form `#graph?highlight-node=REACTION_1234` focuses a node:
 - **Every diagram on the page reacts** - no diagram needs an id of its own. A diagram that
   does not contain the node simply does nothing.
 - The page scrolls to the first matching figure, the node is visibly highlighted
-  (`data-plantuml-focused-node`, restylable from site CSS), and a zoomable diagram snaps to
-  **100% centred on the node**. The highlight stays until the hash changes.
+  (`data-plantuml-focused-node`), and a zoomable diagram snaps to **100% centred on the
+  node**. The highlight stays until the hash changes. It uses the theme's success green by
+  default; set `--plantuml-focus-color` in site CSS to pick any other colour:
+
+  ```css
+  :root {
+    --plantuml-focus-color: #3578e5; /* a light blue instead */
+  }
+  ```
+
 - The hash is watched live, so following a `#graph?…` link anywhere on the page - including
   one inside a Graphviz diagram - focuses the node without a reload.
 - A `#graph?…` hash defeats lazy loading for the page's diagrams, so a target below the

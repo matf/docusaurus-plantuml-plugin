@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `baseUrl` exactly as markdown links do. External links and pure `#…` anchors stay native,
   and clicks that end a drag never navigate.
 
+### Changed
+
+- **The deep-link highlight is green, not red.** The focused-node colour was the theme's
+  danger red, which reads as an error on a highlight that persists until the hash changes;
+  it now defaults to the theme's success green. Sites can pick any colour by setting
+  `--plantuml-focus-color` — the rule reads
+  `var(--plantuml-focus-color, var(--ifm-color-success))`.
+
 ## [1.4.0] - 2026-08-13
 
 ### Added

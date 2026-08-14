@@ -196,7 +196,13 @@
  */
 .figure .canvas svg text[data-plantuml-focused-node],
 .figure .canvas svg [data-plantuml-focused-node] text {
-  fill: var(--ifm-color-danger-dark);
+  /*
+   * The theme's success green, not danger red: this highlight persists until the hash
+   * changes, and a standing red reads as an error. Text stays *filled* with an accent
+   * rather than boxed in a light tint because SVG text has no background to tint — and
+   * the variable lets a site pick its own colour without fighting specificity.
+   */
+  fill: var(--plantuml-focus-color, var(--ifm-color-success));
   text-decoration: underline;
 }
 
