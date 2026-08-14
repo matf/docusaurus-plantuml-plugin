@@ -78,6 +78,16 @@ async function renderReady(props: Parameters<typeof PlantUmlDiagram>[0] = {sourc
   const result = render(<PlantUmlDiagram {...props} />);
   scrollIntoView();
   await waitFor(() => expect(figure()).toHaveAttribute('data-plantuml-status', 'ready'));
+  // `ready` is written during the render commit, but the navigation listener attaches from
+  // a passive effect that React flushes afterwards — a click dispatched in between finds no
+  // handler (it bit on Node 24's CI runners). The zoom hook's transform write happens in
+  // the same synchronous flush, so once it is visible, every effect of the commit has run.
+  const viewport = document.querySelector('[data-plantuml-zoom]');
+  if (viewport) {
+    await waitFor(() =>
+      expect((viewport.firstElementChild as HTMLElement).style.transform).not.toBe(''),
+    );
+  }
   return result;
 }
 
