@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `17.9.0` → `17.11.0`, `typescript-eslint` `8.66.0` → `8.67.0`. No product code changed; all 651
   tests pass unchanged.
 
+  jsdom 27 added `@exodus/bytes`, which needs `@noble/hashes` `^1.8.0 || ^2.0.0`, while
+  `@docusaurus/core`'s dev server reaches `pkijs`, which pins that package to **exactly** `1.4.0`.
+  npm 11 hoists `1.4.0` and leaves the tree invalid without saying so; npm 10 — what Node 20 and
+  22 ship, and what CI therefore runs — correctly refuses the resulting lockfile with
+  `Missing: @noble/hashes@2.3.0`. An `overrides` entry pins `@noble/hashes` to `^1.8.0`, which
+  both consumers accept. Overrides apply only to this repository's own installs, never to a
+  consumer's.
+
   `.github/dependabot.yml` now ignores **jsdom 30 and above**. jsdom 30 requires Node
   `^22.22.2 || ^24.15.0 || >=26.0.0`, dropping Node 20 outright, and the honest consequence of
   taking it would be raising this package's `engines.node`. That is not ours to raise:
