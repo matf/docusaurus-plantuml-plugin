@@ -51,6 +51,18 @@ rootPkg.repository = {type: 'git', url: `git+${repoUrl}.git`};
 rootPkg.bugs = {url: `${repoUrl}/issues`};
 writeJson('package.json', rootPkg);
 
+// --- lockfile version --------------------------------------------------------------
+// `npm version` moves these two alongside package.json, but a hand-edited version does not, and
+// they have drifted before. Releases are cut from `package.json`, so a stale lockfile means
+// anyone installing from source gets a version string that disagrees with what was published.
+const lockPath = 'package-lock.json';
+const lock = readJson(lockPath);
+if (lock.version !== rootPkg.version || lock.packages?.['']?.version !== rootPkg.version) {
+  lock.version = rootPkg.version;
+  if (lock.packages?.['']) lock.packages[''].version = rootPkg.version;
+  writeJson(lockPath, lock);
+}
+
 // --- example site ------------------------------------------------------------------
 const examplePkgPath = 'examples/docusaurus/package.json';
 const examplePkg = readJson(examplePkgPath);

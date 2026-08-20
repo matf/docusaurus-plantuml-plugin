@@ -149,9 +149,26 @@ exactly that situation.
   hard to review and harder to revert.
 - Update the docs in the same pull request: the README options table, `docs/architecture.md`,
   and the `## [Unreleased]` section of `CHANGELOG.md` (Keep a Changelog style).
+- **The `## [Unreleased]` entry decides the version.** Merging to `main` releases automatically,
+  and `.github/workflows/release.yml` reads that section to pick the level: `### Removed` or the
+  word `BREAKING` cuts a major, `### Added` a minor, anything else a patch. Put your change under
+  the heading that describes it, not the one that sounds nicest. A pull request with an empty
+  `[Unreleased]` releases nothing at all.
 - Say in the description which checks you ran, and note anything you could not run locally.
-- Do not bump the version or create a tag in a pull request. Releases are the maintainer's
-  job — see the release section of the README.
+- Do not bump the version or create a tag in a pull request. Releases are cut by
+  `release.yml` — see the release section of the README.
+
+## Dependency updates
+
+Dependabot opens **one** pull request a week for npm (covering the plugin and the example site
+together) and one for GitHub Actions. Minor and patch updates merge themselves as soon as the
+`CI complete` check is green; majors ride in the same pull request and are held for review, with
+a comment saying which dependency is holding them.
+
+A major that cannot be taken at all belongs in the `ignore:` list in `.github/dependabot.yml`,
+with a note saying what breaks and what would unblock it. Every entry there follows that shape.
+Leaving it un-ignored means a grouped pull request that can never go green, which hides the
+updates that _are_ takeable.
 
 ## Reporting bugs
 

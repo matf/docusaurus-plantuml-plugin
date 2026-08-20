@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependency updates merge themselves, and releases are cut by CI rather than from a laptop.**
+  Dependabot now opens **one** pull request a week for npm — covering the plugin and the example
+  site together — and one for GitHub Actions. Minor and patch updates auto-merge once the new
+  `CI complete` check is green; majors ride in the same pull request and are held for review with
+  a comment naming what holds them.
+
+  Every green `main` then runs `.github/workflows/release.yml`, which reads `## [Unreleased]` to
+  decide the version (`### Removed` or `BREAKING` → major, `### Added` → minor, anything else →
+  patch, empty → no release), bumps `package.json` and `package-lock.json`, closes the section
+  into a dated one, and pushes the commit and the tag **atomically**. The old
+  `npm version && git push --follow-tags` recipe could leave a tag pointing at a pre-rebase commit
+  whenever a dependency pull request landed in between — and `verify:tag` could not see it,
+  because the tag and `package.json` agreed. `publish.yml` now also creates the GitHub Release,
+  after npm has accepted the publish. Recorded in
+  [ADR 0006](docs/adr/0006-automated-release-from-changelog.md).
+
+- `npm run sync:check` now also asserts that `package-lock.json`'s `version` fields match
+  `package.json`, and `npm run sync:meta` fixes them. That drift had to be repaired by hand once
+  already.
+
 ## [1.5.0] - 2026-08-14
 
 ### Added

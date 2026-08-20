@@ -1245,11 +1245,35 @@ DOT-only page that proves the PlantUML engine is never fetched for it.
 
 ## Release process
 
-Releases are triggered by pushing a version tag:
+Releases are automatic. Nothing is run from a local checkout, and nothing is tagged by hand.
+
+Every merge into `main` runs CI; when CI goes green, `.github/workflows/release.yml` reads
+`CHANGELOG.md` and decides whether the merge warrants a release and at what level:
+
+| `## [Unreleased]` contains                         | Release |
+| -------------------------------------------------- | ------- |
+| `### Removed`, or the word `BREAKING`              | major   |
+| `### Added`                                        | minor   |
+| any other section (`Fixed`, `Changed`, `Security`) | patch   |
+| nothing, but only dependency bumps since the tag   | patch   |
+| nothing else                                       | none    |
+
+That is why `CONTRIBUTING.md` insists on a `## [Unreleased]` entry in every pull request: the
+entry is what sets the version. Dependency-only merges need no entry — the workflow writes one
+from the commit subjects.
+
+Having decided, the workflow runs `scripts/next-release.mjs`, which bumps `package.json` and
+`package-lock.json`, closes `## [Unreleased]` into a dated section, opens a fresh empty one and
+adds the compare link at the foot of the changelog. It then pushes the `Release <version>`
+commit and the `v<version>` tag **atomically** — both land or neither does, so a tag can never
+describe a tree that is not on `main`. If `main` moved underneath, it rebuilds the release from
+the new `main` rather than forcing anything.
+
+To release a specific version, or to see what would happen without touching anything:
 
 ```bash
-npm version 1.2.3          # updates package.json and creates the v1.2.3 tag
-git push --follow-tags
+gh workflow run release.yml -f dry_run=true      # decide and print, push nothing
+gh workflow run release.yml -f version=2.0.0     # release a version explicitly
 ```
 
 Pushing `v<version>` runs `.github/workflows/publish.yml`, which:
@@ -1262,6 +1286,9 @@ Pushing `v<version>` runs `.github/workflows/publish.yml`, which:
    match the `version` in `package.json` (tag `v1.2.3` ⇒ version `1.2.3`).
 4. Publishes with `npm publish --access public` — the package is scoped, so `--access public`
    is required for the first and every subsequent publish.
+5. Creates the GitHub Release, with that version's changelog section as its notes. This runs
+   only after npm has accepted the publish, so a GitHub Release never exists without the npm
+   release behind it.
 
 Prereleases follow the same path: a version like `1.2.3-beta.1` is published under a
 non-`latest` dist-tag, so `npm install @matfsw/docusaurus-plantuml-plugin` keeps resolving to
@@ -1270,7 +1297,13 @@ the last stable release.
 Authentication is npm **trusted publishing** over GitHub Actions OIDC. There is no long-lived
 npm token anywhere in this repository, in its workflows, or in its secrets. The workflow runs
 in a GitHub environment named `npm`, so maintainers can require manual approval before a
-release proceeds. Provenance is attested automatically by trusted publishing.
+release proceeds — that environment is the one place to put a brake on the automation.
+Provenance is attested automatically by trusted publishing.
+
+The release commit and the tag are pushed with a GitHub App installation token rather than
+`GITHUB_TOKEN`, because a push made with `GITHUB_TOKEN` triggers no further workflow runs — the
+tag would sit there and `publish.yml` would never fire. See
+`docs/adr/0006-automated-release-from-changelog.md`.
 
 ## npm trusted publisher: one-time setup
 

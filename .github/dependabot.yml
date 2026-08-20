@@ -1,27 +1,34 @@
 version: 2
 
 updates:
+  # One pull request for every npm update in the repository. The plugin and the example site it
+  # is tested against share a single PR, so their lockfiles can never disagree about a shared
+  # dependency, and there is never a second open PR whose lockfile goes stale behind the first.
+  #
+  # `open-pull-requests-limit: 1` is the load-bearing part: releases are cut automatically from
+  # every green `main`, and two dependency PRs racing into `main` is exactly what that automation
+  # must never have to reason about.
   - package-ecosystem: npm
-    directory: '/'
+    directories:
+      - '/'
+      - '/examples/docusaurus'
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+      day: monday
+      time: '04:00'
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 1
     groups:
-      # Docusaurus packages are released in lockstep; splitting them across PRs only
-      # produces version mismatches that fail CI.
-      docusaurus:
-        patterns: ['@docusaurus/*']
-      dev-tooling:
-        patterns:
-          - 'eslint*'
-          - '@eslint/*'
-          - 'typescript-eslint'
-          - 'prettier*'
-          - 'vitest'
-          - '@vitest/*'
-          - '@testing-library/*'
-          - 'tsup'
-          - 'typescript'
+      # No `update-types` filter, deliberately: majors join the group instead of spawning a second
+      # PR. `.github/workflows/dependabot-auto-merge.yml` then declines to merge that PR and says
+      # which major is holding it, so a major is reviewed rather than merged — and still visible.
+      # A major that can never be taken belongs in `ignore:` below, which is what that list is for.
+      all:
+        applies-to: version-updates
+        patterns: ['*']
+      all-security:
+        applies-to: security-updates
+        patterns: ['*']
     ignore:
       # The engine's asset layout is part of this plugin's contract, so its major versions
       # are reviewed by hand rather than merged automatically.
@@ -55,16 +62,17 @@ updates:
       - dependency-name: 'eslint-plugin-react-hooks'
         update-types: ['version-update:semver-major']
 
-  - package-ecosystem: npm
-    directory: '/examples/docusaurus'
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      docusaurus:
-        patterns: ['@docusaurus/*']
-
+  # A different ecosystem, so Dependabot cannot fold it into the npm PR above. Scheduling it a day
+  # later keeps the two from overlapping in practice; if they ever do, the `refresh` job in
+  # dependabot-auto-merge.yml brings the second one up to date after the first lands.
   - package-ecosystem: github-actions
     directory: '/'
     schedule:
       interval: weekly
+      day: tuesday
+      time: '04:00'
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns: ['*']

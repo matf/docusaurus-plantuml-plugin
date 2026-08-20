@@ -191,3 +191,30 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # One stable context for the branch ruleset to require. Requiring the matrix jobs by name means
+  # editing the ruleset every time the matrix changes, and a job silently dropped from the matrix
+  # stops being required without anyone noticing. This job depends on every other one and fails
+  # unless all of them succeeded, so `CI complete` is the single check that gates a merge.
+  ci-complete:
+    name: CI complete
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs: [static-analysis, unit-tests, build, packed-integration, docusaurus-compatibility]
+    steps:
+      - name: Fail unless every CI job succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$RESULTS"
+          node -e '
+            const needs = JSON.parse(process.env.RESULTS);
+            const failed = Object.entries(needs).filter(([, job]) => job.result !== "success");
+            if (failed.length > 0) {
+              for (const [name, job] of failed) console.error(`${name}: ${job.result}`);
+              process.exit(1);
+            }
+            console.log("Every CI job succeeded.");
+          '
