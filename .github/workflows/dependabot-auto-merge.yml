@@ -96,20 +96,31 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
+      # `mergeStateStatus` is NOT usable here. GitHub recomputes it asynchronously after a push to
+      # the base branch, so at the instant this job runs it is still reporting the pre-push value —
+      # the first live run said "nothing is behind" while two pull requests were ten commits behind.
+      # `compare`'s `behind_by` is computed on demand and is always current.
       - name: Update every Dependabot pull request that has fallen behind
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           REPO: ${{ github.repository }}
+          BASE: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          behind="$(gh pr list --repo "$REPO" --author 'app/dependabot' --state open \
-            --json number,mergeStateStatus \
-            --jq '.[] | select(.mergeStateStatus == "BEHIND") | .number')"
-          if [ -z "$behind" ]; then
-            echo 'No Dependabot pull request is behind main.'
+          open="$(gh pr list --repo "$REPO" --author 'app/dependabot' --state open \
+            --json number,headRefName --jq '.[] | "\(.number) \(.headRefName)"')"
+          if [ -z "$open" ]; then
+            echo 'No Dependabot pull request is open.'
             exit 0
           fi
-          for number in $behind; do
-            echo "Updating #${number} onto main"
-            gh pr update-branch "$number" --repo "$REPO" || echo "Could not update #${number}; Dependabot will rebase it."
+          printf '%s\n' "$open" | while read -r number branch; do
+            [ -n "$number" ] || continue
+            behind="$(gh api "repos/${REPO}/compare/${BASE}...${branch}" --jq '.behind_by')"
+            if [ "$behind" -eq 0 ]; then
+              echo "#${number} is already up to date."
+              continue
+            fi
+            echo "Updating #${number}, ${behind} commit(s) behind ${BASE}"
+            gh pr update-branch "$number" --repo "$REPO" \
+              || echo "Could not update #${number}; Dependabot will rebase it."
           done

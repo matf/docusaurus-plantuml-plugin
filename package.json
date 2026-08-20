@@ -1,6 +1,6 @@
 {
   "name": "@matfsw/docusaurus-plantuml-plugin",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Render PlantUML diagrams in Docusaurus 3 entirely in the browser - no Java, no PlantUML server, no CDN.",
   "keywords": [
     "docusaurus",
@@ -90,10 +90,10 @@
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.57.0",
     "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^26.1.2",
+    "@testing-library/user-event": "^14.6.5",
+    "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitest/coverage-v8": "^4.1.10",
@@ -101,19 +101,20 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "globals": "^17.9.0",
-    "jsdom": "^26.1.0",
+    "globals": "^17.11.0",
+    "jsdom": "^29.1.1",
     "prettier": "^3.6.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tsup": "^8.5.0",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.4",
+    "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.10"
   },
   "overrides": {
     "serialize-javascript": "^7.0.7",
     "uuid": "^11.1.1",
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "@noble/hashes": "^1.8.0"
   }
 }

@@ -54,6 +54,18 @@ updates:
       - dependency-name: '@eslint/js'
         update-types: ['version-update:semver-major']
 
+      # jsdom 30 requires Node `^22.22.2 || ^24.15.0 || >=26.0.0`, dropping Node 20 entirely.
+      # Taking it would mean this repository could no longer test on Node 20, and the honest
+      # consequence of that is raising `engines.node` — which is not ours to raise: `@docusaurus/
+      # core` still declares `node: >=20.0` as of 3.10.2, and a plugin whose floor sits above its
+      # host's cannot be installed into a site Docusaurus itself supports. Node 20 being EOL is
+      # beside the point; the gate is Docusaurus's floor, not Node's support calendar.
+      #
+      # jsdom is a devDependency, so this costs consumers nothing. jsdom 29 still supports
+      # `^20.19.0` and is taken. Revisit when Docusaurus raises its own minimum.
+      - dependency-name: 'jsdom'
+        versions: ['>=30']
+
       # eslint-plugin-react-hooks 7 turns on the React Compiler rules. `react-hooks/refs` and
       # `react-hooks/set-state-in-effect` flag 15 places in `useZoomPan`, all of them the
       # deliberate design recorded in docs/adr/0003-zoom-container-transform.md: the transform
