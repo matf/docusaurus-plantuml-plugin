@@ -10,7 +10,8 @@ on:
 # `id-token: write` is what lets npm's trusted publishing exchange a GitHub OIDC token for
 # short-lived publish credentials. No npm token exists anywhere in this repository.
 permissions:
-  contents: read
+  # `contents: write` creates the GitHub Release once npm has accepted the publish.
+  contents: write
   id-token: write
 
 # Two pushes of the same tag must never race into two publish attempts.
@@ -83,3 +84,20 @@ jobs:
         # No NODE_AUTH_TOKEN and no .npmrc credentials: authentication comes from the OIDC
         # token exchange that npm performs for trusted publishers.
         run: npm publish --access public --tag "${{ steps.release.outputs.dist_tag }}"
+
+      # Only after npm has the package: a GitHub Release that exists without the npm release
+      # behind it is worse than no GitHub Release at all.
+      - name: Create the GitHub Release from this version's changelog section
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          notes="${RUNNER_TEMP}/release-notes.md"
+          node scripts/changelog-notes.mjs "${{ steps.release.outputs.version }}" >"$notes"
+          cat "$notes"
+          if [ "${{ steps.release.outputs.dist_tag }}" = 'latest' ]; then
+            gh release create "$TAG" --title "$TAG" --notes-file "$notes" --latest
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file "$notes" --prerelease
+          fi

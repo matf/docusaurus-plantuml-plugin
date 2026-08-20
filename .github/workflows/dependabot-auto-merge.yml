@@ -1,0 +1,115 @@
+# Merges Dependabot's pull requests once every CI job is green, and keeps whichever ones are left
+# open from going stale behind the branch.
+#
+# SECURITY — read before editing.
+#
+# This workflow runs on `pull_request_target`, which means it executes the workflow file from the
+# base branch with a token that can write to the repository. That is necessary because Dependabot's
+# pull requests get a read-only `GITHUB_TOKEN` and no access to secrets under `pull_request`. It is
+# safe only because no step here checks out, installs, builds or otherwise runs a single line of
+# code from the pull request — every step is an API call. Adding `actions/checkout` with
+# `github.event.pull_request.head.sha`, or an `npm ci`, would hand write access to whatever the
+# pull request contains. Do not.
+name: Dependabot auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+# Each job asks for exactly what it needs; nothing is granted at the workflow level.
+permissions: {}
+
+# Enabling auto-merge and refreshing branches are both cheap, but they mutate pull request state,
+# so never let two runs interleave.
+concurrency:
+  group: dependabot-auto-merge-${{ github.event_name }}-${{ github.event.pull_request.number || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  enable:
+    name: Enable auto-merge
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: read
+    steps:
+      # Auto-merge is enabled *as the app*, so GitHub attributes the eventual merge to the app.
+      # A merge attributed to `GITHUB_TOKEN` would not trigger CI on `main`, and without that CI
+      # run there is no release. This is the whole reason the app exists.
+      - name: Mint an app token
+        id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Read what this pull request updates
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Merge when every check passes
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
+
+      # A major rides in the same grouped pull request rather than opening a second one, so it has
+      # to be reviewed by hand. Say so on the pull request instead of leaving it silently stuck.
+      # Only on open/reopen: a `synchronize` comment on every force-push would be noise.
+      - name: Explain why a major is held
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major' && github.event.action != 'synchronize'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          NAMES: ${{ steps.metadata.outputs.dependency-names }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$PR_URL" --body "Not auto-merging: this update includes a **major** version bump, and majors are reviewed by hand.
+
+          Updated here: \`${NAMES}\`
+
+          Merge it manually once you have checked it. If the major cannot be taken at all, add it to the
+          \`ignore:\` list in \`.github/dependabot.yml\` with a note saying what breaks, so it stops holding
+          the rest of the group."
+
+  # A pull request that is behind `main` cannot merge once the ruleset requires branches to be up
+  # to date. Dependabot rebases its own branches, but only on its own schedule; this closes the gap
+  # immediately so a queue of dependency pull requests drains without anyone touching it.
+  refresh:
+    name: Refresh open Dependabot branches
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Mint an app token
+        id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Update every Dependabot pull request that has fallen behind
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          behind="$(gh pr list --repo "$REPO" --author 'app/dependabot' --state open \
+            --json number,mergeStateStatus \
+            --jq '.[] | select(.mergeStateStatus == "BEHIND") | .number')"
+          if [ -z "$behind" ]; then
+            echo 'No Dependabot pull request is behind main.'
+            exit 0
+          fi
+          for number in $behind; do
+            echo "Updating #${number} onto main"
+            gh pr update-branch "$number" --repo "$REPO" || echo "Could not update #${number}; Dependabot will rebase it."
+          done
