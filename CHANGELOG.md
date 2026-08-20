@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Development dependencies:** `jsdom` `26` → `29`, `@testing-library/jest-dom` `7.0.0` → `7.0.1`,
+  `@testing-library/user-event` `14.6.3` → `14.6.5`, `@types/node` `26.1.2` → `26.2.0`, `globals`
+  `17.9.0` → `17.11.0`, `typescript-eslint` `8.66.0` → `8.67.0`. No product code changed; all 651
+  tests pass unchanged.
+
+  jsdom 27 added `@exodus/bytes`, which needs `@noble/hashes` `^1.8.0 || ^2.0.0`, while
+  `@docusaurus/core`'s dev server reaches `pkijs`, which pins that package to **exactly** `1.4.0`.
+  npm 11 hoists `1.4.0` and leaves the tree invalid without saying so; npm 10 — what Node 20 and
+  22 ship, and what CI therefore runs — correctly refuses the resulting lockfile with
+  `Missing: @noble/hashes@2.3.0`. An `overrides` entry pins `@noble/hashes` to `^1.8.0`, which
+  both consumers accept. Overrides apply only to this repository's own installs, never to a
+  consumer's.
+
+  `.github/dependabot.yml` now ignores **jsdom 30 and above**. jsdom 30 requires Node
+  `^22.22.2 || ^24.15.0 || >=26.0.0`, dropping Node 20 outright, and the honest consequence of
+  taking it would be raising this package's `engines.node`. That is not ours to raise:
+  `@docusaurus/core` still declares `node: >=20.0` as of 3.10.2, and a plugin whose floor sits
+  above its host's cannot be installed into a site Docusaurus itself supports. jsdom 29 still
+  supports `^20.19.0`, which is what `.nvmrc` pins.
+
+### Fixed
+
+- **The Dependabot branch refresh no longer races GitHub.** It selected pull requests by
+  `mergeStateStatus == "BEHIND"`, but GitHub recomputes that field asynchronously after a push to
+  the base branch — on its first live run it reported nothing behind while two pull requests were
+  ten commits behind. It now asks `compare` for `behind_by`, which is computed on demand.
+
+- `actions/create-github-app-token` and `dependabot/fetch-metadata` were pinned at `v2`; both are
+  at `v3`.
+
 ## [1.5.1] - 2026-08-20
 
 ### Changed
