@@ -1337,6 +1337,30 @@ _installing_ private dependencies. This repository has no private dependencies, 
 add a read token to CI. Add one only if the repository genuinely starts consuming a private
 package.
 
+## Release GitHub App: one-time setup
+
+`release.yml` and `dependabot-auto-merge.yml` push and merge with a GitHub App installation
+token rather than `GITHUB_TOKEN`. This is not a preference: GitHub deliberately does not trigger
+workflow runs from events created with `GITHUB_TOKEN`, so under that token an auto-merge would
+not run CI on `main` and a pushed tag would not run `publish.yml`. Nothing would ever reach npm.
+
+Done once, by a repository admin:
+
+1. **Create a GitHub App** owned by the repository owner, with the webhook **inactive**.
+2. **Repository permissions, and nothing else**: Contents **Read and write** (push the release
+   commit and tag), Pull requests **Read and write** (enable auto-merge, comment, update a
+   branch), Metadata Read-only (mandatory).
+3. **Install it on this repository only**, and generate a private key.
+4. **Store the credentials** under _Settings → Secrets and variables → Actions_:
+   `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY` (the whole `.pem`, BEGIN/END lines included).
+5. **Add the App as a bypass actor** on the `main` ruleset. A ruleset's required-status-checks
+   rule blocks direct pushes as well as merges, and the release commit is a direct push. The
+   safety net is `publish.yml`, which re-runs the entire suite on the tagged tree before
+   `npm publish`, so a bad release commit cannot reach npm even though it can reach `main`.
+
+Installation tokens are repo-scoped and expire in an hour. A personal access token would work
+too and was rejected: it carries one person's account reach and expires on a calendar.
+
 ## Limitations
 
 - **A theme providing `MDXComponents/Code` must already be installed.** The plugin wraps that
