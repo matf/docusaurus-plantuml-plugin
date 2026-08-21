@@ -52,8 +52,26 @@
  * the figure keeps the exact height it has at 100% no matter how far the reader zooms in, and
  * `max-width: 100%` on the SVG keeps constraining the base size as it always did.
  */
+
+/*
+ * The frame is three stacked rows — controls, picture, minimap toggle — not one box with
+ * chrome floating over it.
+ *
+ * Floating it covered the diagram: the toolbar sat over the top right of every figure and the
+ * minimap toggle over the bottom left, and at 100% — the view every reader arrives at — that
+ * is exactly where a sequence diagram's first participant and a graph's leftmost node are
+ * drawn. No amount of nudging fixes that, because the picture is whatever shape its author
+ * drew. A row of its own for each control group means the opening view has nothing painted
+ * over it at all. Zooming can still slide content under a row's edge, which is fine: by then
+ * the reader is driving, and the alternative is a frame that grows as you zoom.
+ *
+ * `position: relative` stays for the maximized overlay's sake, not for the controls.
+ */
 .stage {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .viewport {
@@ -108,14 +126,15 @@
 /*
  * One flex row holds the search bar and the toolbar, so opening the search never needs to
  * know how wide the toolbar happens to be — it simply takes the space to its left.
+ *
+ * `flex-end` keeps the toolbar where readers have always found it, at the top right of the
+ * frame — now above the picture rather than on top of it.
  */
 .controls {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
   display: flex;
   gap: 0.5rem;
   align-items: flex-start;
+  justify-content: flex-end;
 }
 
 .toolbar {
@@ -126,7 +145,6 @@
   border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: var(--ifm-global-radius);
   background: var(--ifm-background-surface-color);
-  opacity: 0.92;
 }
 
 .searchBar {
@@ -137,7 +155,6 @@
   border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: var(--ifm-global-radius);
   background: var(--ifm-background-surface-color);
-  opacity: 0.92;
 }
 
 .searchInput {
@@ -275,9 +292,8 @@
   position: fixed;
   inset: 0;
   z-index: var(--ifm-z-index-overlay, 400);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* Keeps the control rows off the screen's edges; `inset: 0` fixes the border box either way. */
+  padding: 0.5rem;
   /*
    * `--ifm-background-surface-color`, not `--ifm-background-color`: Infima defines the latter
    * as `#0000` in light mode, so the overlay would be transparent and the page would show
@@ -288,9 +304,30 @@
   background: var(--ifm-background-surface-color, #ffffff);
 }
 
+/*
+ * The picture takes every pixel the two control rows leave. `min-height: 0` is what allows
+ * that: a flex item's floor is its content, so without it a tall diagram would push the
+ * minimap row off the bottom of the screen instead of being clipped by its own viewport.
+ *
+ * The viewport itself needs no size: it is the lone item in `.stageBody`'s grid cell, so it
+ * stretches to whatever the row is given — 100vw/100dvh here would ignore the padding and
+ * the rows and overflow the overlay by exactly their height.
+ */
+.maximized .stageBody {
+  flex: 1;
+  min-height: 0;
+  /*
+   * The row must take the height it is *given*, not the height the picture wants. A grid
+   * track sized `auto` floors at max-content, so a diagram taller than the screen sized the
+   * row past the frame and the viewport painted straight over the minimap row below it —
+   * and, worse, `fitScale` then measured that overflowing viewport and concluded the diagram
+   * already fitted. `minmax(0, 1fr)` removes the floor, so the track is exactly the free
+   * height and the viewport clips the picture as it does everywhere else.
+   */
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .maximized .viewport {
-  width: 100vw;
-  height: 100dvh;
   max-height: none;
 }
 
@@ -302,21 +339,26 @@
  * as one block, so it keeps exactly the geometry of the real canvas and the rectangle's
  * coordinates can be multiplied straight through.
  */
+
+/* The toggle's own row. `flex-start` keeps it button-sized rather than frame-wide. */
 .minimapBar {
-  position: absolute;
-  bottom: 0.5rem;
-  left: 0.5rem;
   display: flex;
+  align-self: flex-start;
   padding: 0.25rem;
   border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: var(--ifm-global-radius);
   background: var(--ifm-background-surface-color);
-  opacity: 0.92;
 }
 
+/*
+ * The map itself does still float over the picture, in the bottom-left corner of the diagram
+ * row — it is a child of `.stageBody`, so that is the box it is anchored in. A control the
+ * reader has explicitly opened may cover the picture; the ones that are simply always there
+ * may not, which is why only this one is positioned.
+ */
 .minimap {
   position: absolute;
-  bottom: 3.25rem;
+  bottom: 0.5rem;
   left: 0.5rem;
   /*
    * The close control sits *beside* the map, not floating over it: a wide, short diagram
@@ -563,8 +605,8 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
-  /* Clears the toolbar, which floats over the top-right of the same frame. */
-  padding: 0.5rem 12rem 0.25rem 0.75rem;
+  /* No clearance needed: the toolbar has a row above the frame, not a corner inside it. */
+  padding: 0.5rem 0.75rem 0.25rem;
 }
 
 .sourceViewTitle {

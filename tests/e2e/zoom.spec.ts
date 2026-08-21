@@ -16,16 +16,28 @@ function layerOf(figure: Locator): Locator {
   return figure.locator('[data-plantuml-zoom] > div').first();
 }
 
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /**
  * Measures in the page rather than with `locator.boundingBox()`, which clips the result to the
  * visible area — a zoomed layer inside an `overflow: clip` viewport would be reported at
  * viewport size instead of its true transformed size.
  */
-async function rectOf(locator: Locator) {
+async function rectOf(locator: Locator): Promise<Rect> {
   return locator.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     return {x: rect.x, y: rect.y, width: rect.width, height: rect.height};
   });
+}
+
+/** Whether two boxes share any area at all — the whole question this fixed. */
+function overlaps(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
 /**
@@ -91,6 +103,66 @@ test.describe('zoom and pan', () => {
 
     // Anything inside role="img" is invisible to assistive technology.
     await expect(page.locator('[role="img"] button')).toHaveCount(0);
+  });
+
+  test('stacks the controls in rows, so nothing covers the diagram at 100%', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    // 100% is the view a reader arrives at, and the only one this promises anything about.
+    expect(await zoomLevel(page)).toBe(1);
+
+    const picture = await rectOf(figure.locator(DIAGRAM_SVG));
+    const toolbar = await rectOf(figure.getByRole('group', {name: /zoom controls/}));
+    const minimapToggle = await rectOf(figure.getByRole('button', {name: 'Show minimap'}));
+
+    // The defect: both control groups used to be painted over the picture's corners, which on
+    // a sequence diagram is its first participant and on a graph its leftmost node.
+    expect(overlaps(toolbar, picture), 'the toolbar covers the diagram').toBe(false);
+    expect(overlaps(minimapToggle, picture), 'the minimap toggle covers the diagram').toBe(false);
+
+    // Rows specifically: one wholly above the picture, one wholly below it.
+    expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(picture.y + 1);
+    expect(minimapToggle.y + 1).toBeGreaterThanOrEqual(picture.y + picture.height);
+
+    // The search bar opens beside the toolbar, inside the same row.
+    await figure.getByRole('button', {name: 'Search diagram'}).click();
+    const searchBar = await rectOf(figure.getByRole('search'));
+    expect(overlaps(searchBar, picture), 'the search bar covers the diagram').toBe(false);
+    await page.keyboard.press('Escape');
+  });
+
+  test('keeps both control rows on screen while maximized', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    await figure.getByRole('button', {name: 'Maximize diagram'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-maximized', 'true');
+
+    const screenSize = page.viewportSize();
+    const toolbar = await rectOf(figure.getByRole('group', {name: /zoom controls/}));
+    const minimapToggle = await rectOf(figure.getByRole('button', {name: 'Show minimap'}));
+
+    // The overlay is `inset: 0`, so the diagram row has to *give up* the rows' height rather
+    // than take the whole screen — otherwise the bottom row is pushed off the screen entirely.
+    expect(toolbar.y).toBeGreaterThanOrEqual(-1);
+    expect(minimapToggle.y + minimapToggle.height).toBeLessThanOrEqual(
+      (screenSize?.height ?? 0) + 1,
+    );
+
+    // And the fitted picture sits between them, not under them. Polled, not read once:
+    // maximizing eases the fit transform over 150ms, so the geometry settles after the
+    // attribute does.
+    await expect
+      .poll(async () => {
+        const picture = await rectOf(layerOf(figure));
+        return overlaps(toolbar, picture) || overlaps(minimapToggle, picture);
+      })
+      .toBe(false);
+
+    await page.keyboard.press('Escape');
   });
 
   test('zooming magnifies the diagram without changing the page layout', async ({page}) => {
@@ -368,12 +440,16 @@ test.describe('zoom and pan', () => {
 
     const layer = layerOf(figure);
     const before = await rectOf(layer);
+    // Relative to whatever the opening fit landed on, not an absolute level: the maximized
+    // viewport is the screen *minus the two control rows*, so a diagram taller than that
+    // opens below 100% and three steps from there need not clear any particular number.
+    const opening = await zoomLevel(page);
 
     const zoomIn = figure.getByRole('button', {name: 'Zoom in'});
     await zoomIn.click();
     await zoomIn.click();
     await zoomIn.click();
-    await expect.poll(() => zoomLevel(page)).toBeGreaterThan(1.9);
+    await expect.poll(() => zoomLevel(page)).toBeGreaterThan(opening * 1.9);
     await expect.poll(async () => (await rectOf(layer)).width).toBeGreaterThan(before.width * 1.5);
 
     const after = await rectOf(layer);

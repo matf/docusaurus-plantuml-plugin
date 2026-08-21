@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The zoom controls no longer cover the diagram.** The toolbar was painted over the frame's
+  top-right corner and the minimap toggle over its bottom-left, so at 100% — the view a reader
+  arrives at without touching anything — a sequence diagram's first participant and a graph's
+  leftmost node were sitting underneath a row of buttons. No placement fixes that, because the
+  picture is whatever shape its author drew.
+
+  A zoomable diagram is now laid out as three stacked rows: the toolbar (with the search bar
+  opening beside it), the diagram, and the minimap toggle. Nothing is painted over the picture
+  at any zoom level; the frame is two button-bar rows taller than before, which is the price of
+  never covering the content. The control row is now also the frame's **first** child in the
+  DOM, so tab order follows what the reader sees. Maximizing uses the same three rows, so the
+  bottom row stays on screen instead of being pushed off it.
+
+  The minimap _panel_ still floats over the diagram's bottom-left corner — the reader opens it
+  deliberately and closes it from its own ✕ — and the source view's header no longer reserves a
+  12rem gutter for a toolbar that is no longer above it.
+
 ## [1.5.2] - 2026-08-20
 
 ### Changed

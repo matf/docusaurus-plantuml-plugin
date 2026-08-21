@@ -497,42 +497,14 @@ export default function PlantUmlDiagram({
           className={zoom.maximized ? `${styles.stage} ${styles.maximized}` : styles.stage}
         >
           {/*
-           * The viewport and the source view share one grid cell, so the source lands exactly
-           * where the picture was, at exactly its size. The viewport is hidden with
-           * `visibility`, not `display`, so it keeps contributing its height — the frame does
-           * not resize when you flip — and the zoom hook's `clientWidth`/`clientHeight`
-           * measurements stay valid for when you flip back.
-           */}
-          <div className={styles.stageBody}>
-            <div
-              ref={zoom.viewportRef}
-              className={
-                sourceOpen ? `${styles.viewport} ${styles.invisibleView}` : styles.viewport
-              }
-              tabIndex={sourceOpen ? -1 : 0}
-              aria-describedby={hintId}
-              aria-keyshortcuts="Plus Minus 0 ArrowUp ArrowDown ArrowLeft ArrowRight"
-              onKeyDown={zoom.onKeyDown}
-              // React renders the initial value so the element is findable by this attribute from the
-              // first paint — it is the selector tests and author CSS use. The hook then owns the value.
-              // React never rewrites an unchanged attribute, so the two do not fight.
-              {...{[DATA_ATTR.zoom]: '1'}}
-            >
-              {/*
-               * The transform layer sits outside the `role="img"` element on purpose: that
-               * element uses `dangerouslySetInnerHTML`, so it cannot have React children, and
-               * `role="img"` makes its whole subtree opaque to assistive technology.
-               */}
-              <div ref={zoom.layerRef} className={styles.layer}>
-                {canvas}
-              </div>
-            </div>
-            {sourceView}
-          </div>
-
-          {/*
-           * One row for the search bar and the toolbar, so the bar opens beside the controls
-           * without either needing to know the other's width.
+           * The controls have a row of their own above the picture, rather than floating over
+           * its top-right corner. At 100% — the view every reader arrives at — that corner is
+           * where a sequence diagram draws its first participant and a graph its leftmost node,
+           * so the toolbar covered the diagram exactly where it was most worth reading.
+           *
+           * The row comes first in the DOM as well as on screen, so tab order follows what the
+           * reader sees. Within it, one flex row holds the search bar and the toolbar, so the
+           * bar opens beside the controls without either needing to know the other's width.
            */}
           <div className={styles.controls}>
             {search.open && !sourceOpen && (
@@ -674,13 +646,52 @@ export default function PlantUmlDiagram({
           </div>
 
           {/*
-           * Bottom-left, mirroring the toolbar's top-right: the minimap toggle, with the map
-           * itself above it while open. Both disappear with the picture when the source view
-           * is flipped on — a map of an invisible diagram would pan nothing anyone can see.
+           * The viewport and the source view share one grid cell, so the source lands exactly
+           * where the picture was, at exactly its size. The viewport is hidden with
+           * `visibility`, not `display`, so it keeps contributing its height — the frame does
+           * not resize when you flip — and the zoom hook's `clientWidth`/`clientHeight`
+           * measurements stay valid for when you flip back.
            */}
-          {!sourceOpen && minimapOpen && (
-            <Minimap svg={state.svg} zoom={zoom} onClose={() => setMinimapOpen(false)} />
-          )}
+          <div className={styles.stageBody}>
+            <div
+              ref={zoom.viewportRef}
+              className={
+                sourceOpen ? `${styles.viewport} ${styles.invisibleView}` : styles.viewport
+              }
+              tabIndex={sourceOpen ? -1 : 0}
+              aria-describedby={hintId}
+              aria-keyshortcuts="Plus Minus 0 ArrowUp ArrowDown ArrowLeft ArrowRight"
+              onKeyDown={zoom.onKeyDown}
+              // React renders the initial value so the element is findable by this attribute from the
+              // first paint — it is the selector tests and author CSS use. The hook then owns the value.
+              // React never rewrites an unchanged attribute, so the two do not fight.
+              {...{[DATA_ATTR.zoom]: '1'}}
+            >
+              {/*
+               * The transform layer sits outside the `role="img"` element on purpose: that
+               * element uses `dangerouslySetInnerHTML`, so it cannot have React children, and
+               * `role="img"` makes its whole subtree opaque to assistive technology.
+               */}
+              <div ref={zoom.layerRef} className={styles.layer}>
+                {canvas}
+              </div>
+            </div>
+            {/*
+             * The map is the one control still allowed over the picture: the reader opened it,
+             * and it lives inside the diagram row so it is anchored to the picture it mirrors.
+             * It disappears with that picture when the source view is flipped on — a map of an
+             * invisible diagram would pan nothing anyone can see.
+             */}
+            {!sourceOpen && minimapOpen && (
+              <Minimap svg={state.svg} zoom={zoom} onClose={() => setMinimapOpen(false)} />
+            )}
+            {sourceView}
+          </div>
+
+          {/*
+           * The bottom row, mirroring the controls at the top: the minimap toggle, sitting
+           * under the picture rather than over its bottom-left corner.
+           */}
           {!sourceOpen && (
             <div className={styles.minimapBar}>
               <button

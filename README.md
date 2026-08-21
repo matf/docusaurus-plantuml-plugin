@@ -525,7 +525,26 @@ diagram, whichever engine produced it.
 ## Zoom and pan
 
 Large diagrams are unreadable at column width. Rendered diagrams are therefore zoomable and
-pannable by default, with a small control toolbar in the top-right corner.
+pannable by default, with a small control toolbar above the picture.
+
+### The frame's layout
+
+A zoomable diagram is laid out as three stacked rows:
+
+1. the control toolbar, at the top right — the search bar opens beside it, in the same row;
+2. the diagram itself;
+3. the minimap toggle, at the bottom left.
+
+Nothing is painted over the picture, so at 100% — the view a reader arrives at — the whole
+diagram is visible. The controls used to float over the frame's corners, which is exactly where
+a sequence diagram draws its first participant and a graph its leftmost node; no amount of
+nudging fixes that, because the picture is whatever shape its author drew. The rows cost the
+height of two small button bars per diagram, which is the price of never covering the content.
+
+Zooming in can still slide the diagram under a row's edge — the viewport clips it there — and
+that is deliberate: by then the reader is driving, and a frame that grew as you zoomed would
+reflow the page around it. The **minimap**, once opened, does float over the picture's
+bottom-left corner: the reader asked for it, and it closes with its own ✕.
 
 ### Interaction
 
@@ -587,7 +606,7 @@ highlight without touching the plugin.
 
 ### Minimap
 
-The button in the bottom-left corner opens a minimap: a small copy of the diagram with a
+The button in the row beneath the diagram opens a minimap: a small copy of the diagram with a
 rectangle marking what the viewport currently shows. Press or drag anywhere on the map to
 centre the view there — a single press works as "jump there". The map follows every zoom,
 pan and resize, works while maximized, and closes from its own ✕ or the toggle.
@@ -635,6 +654,8 @@ would mean most readers never discover it. The costs are real and worth knowing:
 
 - Each zoomable diagram adds a **keyboard tab stop for the viewport and one per toolbar
   button**. On a page with six diagrams that is a meaningful amount of tabbing.
+- The frame is **two button-bar rows taller** than the picture, because the controls sit above
+  and below it rather than over it — see [The frame's layout](#the-frames-layout).
 - The rendered markup gains a viewport and transform wrapper around the `role="img"` container.
   Site CSS that targets `[data-plantuml-diagram] > div[role="img"]` as a **direct child** needs
   updating — see [Accessibility](#accessibility) for both shapes.

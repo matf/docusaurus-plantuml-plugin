@@ -531,6 +531,19 @@ shape the pre-zoom markup has always had, which both the unit and end-to-end sui
 interaction). See [ADR 0003](adr/0003-zoom-container-transform.md) for the reasoning; what
 follows is how it behaves.
 
+**The frame is three rows in flow, not a picture with chrome floating over it.** `.stage` is a
+flex column: the control toolbar, the diagram, the minimap toggle. Both control groups used to
+be `position: absolute` in the frame's corners, which meant that at 100% — the view every
+reader arrives at — they covered a sequence diagram's first participant and a graph's leftmost
+node. That is not a nudging problem: the picture is whatever shape its author drew, so any
+floating control lands on some diagram's content. Rows cost the height of two button bars per
+figure and remove the class of defect entirely. Zooming may still slide content under a row's
+edge, which is fine — the viewport clips it, and the frame keeps the height it had at 100%, so
+the page never reflows. The minimap _panel_ is the one exception, positioned inside the diagram
+row: the reader opened it deliberately and can close it again. Maximized uses the same three
+rows, with the diagram row taking whatever the control rows leave (`flex: 1; min-height: 0` —
+without the floor the picture's content would push the bottom row off the screen).
+
 **The transform goes on a wrapper, never on the SVG.** `.canvas svg {max-width: 100%; height:
 auto}` derives the SVG's laid-out height from its `viewBox` ratio, so mutating `viewBox` would
 reflow the document on every wheel tick. CSS transforms do not participate in layout, so the
