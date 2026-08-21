@@ -62,23 +62,27 @@ test.describe('zoom and pan', () => {
     await expect(wide.locator('div[role="img"] > svg')).toHaveCount(1);
     const group = wide.getByRole('group', {name: /zoom controls/});
     await expect(group).toBeVisible();
-    // Search, zoom out, zoom in, reset, maximize, and the source toggle. Fit is absent
-    // here on purpose — it exists only in the maximized view, where it can fill a screen.
-    await expect(group.getByRole('button')).toHaveCount(6);
+    // Search, zoom out, zoom in, reset, maximize, the minimap toggle and the source toggle.
+    // Fit is absent here on purpose — it exists only in the maximized view, where it can
+    // fill a screen.
+    await expect(group.getByRole('button')).toHaveCount(7);
     await expect(group.getByRole('button', {name: 'Fit diagram to screen'})).toHaveCount(0);
     await expect(group.getByRole('button', {name: 'Maximize diagram'})).toBeVisible();
+    // In the toolbar, not in a row of its own beneath the picture.
+    await expect(group.getByRole('button', {name: 'Show minimap'})).toBeVisible();
     await expect(group.getByRole('button', {name: 'Show diagram source'})).toBeVisible();
 
     // Every control is drawn, not typed. `⛶` U+26F6 had no glyph on a stock Linux desktop,
     // so the maximize button used to render as a tofu box for a whole platform's readers.
     // See issue #21. Asserted against the real build because this is a rendering bug.
-    await expect(group.locator('button > svg')).toHaveCount(6);
+    await expect(group.locator('button > svg')).toHaveCount(7);
     for (const name of [
       'Search diagram',
       'Zoom out',
       'Zoom in',
       'Reset zoom',
       'Maximize diagram',
+      'Show minimap',
     ]) {
       const button = group.getByRole('button', {name});
       await expect(button.locator('svg')).toHaveCount(1);
@@ -105,7 +109,9 @@ test.describe('zoom and pan', () => {
     await expect(page.locator('[role="img"] button')).toHaveCount(0);
   });
 
-  test('stacks the controls in rows, so nothing covers the diagram at 100%', async ({page}) => {
+  test('puts every control in a row above the diagram, covering nothing at 100%', async ({
+    page,
+  }) => {
     await page.goto('docs/zoom');
     await waitForDiagrams(page, 2);
 
@@ -115,16 +121,18 @@ test.describe('zoom and pan', () => {
 
     const picture = await rectOf(figure.locator(DIAGRAM_SVG));
     const toolbar = await rectOf(figure.getByRole('group', {name: /zoom controls/}));
-    const minimapToggle = await rectOf(figure.getByRole('button', {name: 'Show minimap'}));
 
-    // The defect: both control groups used to be painted over the picture's corners, which on
-    // a sequence diagram is its first participant and on a graph its leftmost node.
+    // The defect: the controls used to be painted over the picture's corners, which on a
+    // sequence diagram is its first participant and on a graph its leftmost node.
     expect(overlaps(toolbar, picture), 'the toolbar covers the diagram').toBe(false);
-    expect(overlaps(minimapToggle, picture), 'the minimap toggle covers the diagram').toBe(false);
-
-    // Rows specifically: one wholly above the picture, one wholly below it.
+    // A row specifically: wholly above the picture, not merely beside it.
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(picture.y + 1);
-    expect(minimapToggle.y + 1).toBeGreaterThanOrEqual(picture.y + picture.height);
+
+    // Nothing else is left down there to cover the diagram — the minimap toggle rides in the
+    // toolbar, so there is no second bar under the picture.
+    const toggle = await rectOf(figure.getByRole('button', {name: 'Show minimap'}));
+    expect(overlaps(toggle, picture), 'the minimap toggle covers the diagram').toBe(false);
+    expect(toggle.y + toggle.height).toBeLessThanOrEqual(picture.y + 1);
 
     // The search bar opens beside the toolbar, inside the same row.
     await figure.getByRole('button', {name: 'Search diagram'}).click();
@@ -133,7 +141,9 @@ test.describe('zoom and pan', () => {
     await page.keyboard.press('Escape');
   });
 
-  test('keeps both control rows on screen while maximized', async ({page}) => {
+  test('keeps the control row on screen and clear of the diagram while maximized', async ({
+    page,
+  }) => {
     await page.goto('docs/zoom');
     await waitForDiagrams(page, 2);
 
@@ -143,24 +153,15 @@ test.describe('zoom and pan', () => {
 
     const screenSize = page.viewportSize();
     const toolbar = await rectOf(figure.getByRole('group', {name: /zoom controls/}));
-    const minimapToggle = await rectOf(figure.getByRole('button', {name: 'Show minimap'}));
 
-    // The overlay is `inset: 0`, so the diagram row has to *give up* the rows' height rather
-    // than take the whole screen — otherwise the bottom row is pushed off the screen entirely.
+    // The overlay is `inset: 0`, so the diagram row has to *give up* the control row's height
+    // rather than take the whole screen.
     expect(toolbar.y).toBeGreaterThanOrEqual(-1);
-    expect(minimapToggle.y + minimapToggle.height).toBeLessThanOrEqual(
-      (screenSize?.height ?? 0) + 1,
-    );
+    expect(toolbar.y + toolbar.height).toBeLessThanOrEqual((screenSize?.height ?? 0) + 1);
 
-    // And the fitted picture sits between them, not under them. Polled, not read once:
-    // maximizing eases the fit transform over 150ms, so the geometry settles after the
-    // attribute does.
-    await expect
-      .poll(async () => {
-        const picture = await rectOf(layerOf(figure));
-        return overlaps(toolbar, picture) || overlaps(minimapToggle, picture);
-      })
-      .toBe(false);
+    // And the fitted picture sits below it, not under it. Polled, not read once: maximizing
+    // eases the fit transform over 150ms, so the geometry settles after the attribute does.
+    await expect.poll(async () => overlaps(toolbar, await rectOf(layerOf(figure)))).toBe(false);
 
     await page.keyboard.press('Escape');
   });

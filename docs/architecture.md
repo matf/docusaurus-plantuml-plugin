@@ -531,18 +531,25 @@ shape the pre-zoom markup has always had, which both the unit and end-to-end sui
 interaction). See [ADR 0003](adr/0003-zoom-container-transform.md) for the reasoning; what
 follows is how it behaves.
 
-**The frame is three rows in flow, not a picture with chrome floating over it.** `.stage` is a
-flex column: the control toolbar, the diagram, the minimap toggle. Both control groups used to
-be `position: absolute` in the frame's corners, which meant that at 100% — the view every
-reader arrives at — they covered a sequence diagram's first participant and a graph's leftmost
-node. That is not a nudging problem: the picture is whatever shape its author drew, so any
-floating control lands on some diagram's content. Rows cost the height of two button bars per
-figure and remove the class of defect entirely. Zooming may still slide content under a row's
-edge, which is fine — the viewport clips it, and the frame keeps the height it had at 100%, so
-the page never reflows. The minimap _panel_ is the one exception, positioned inside the diagram
-row: the reader opened it deliberately and can close it again. Maximized uses the same three
-rows, with the diagram row taking whatever the control rows leave (`flex: 1; min-height: 0` —
-without the floor the picture's content would push the bottom row off the screen).
+**The frame is two rows in flow, not a picture with chrome floating over it.** `.stage` is a
+flex column: one control row, then the diagram. Both control groups used to be
+`position: absolute` in the frame's corners, which meant that at 100% — the view every reader
+arrives at — they covered a sequence diagram's first participant and a graph's leftmost node.
+That is not a nudging problem: the picture is whatever shape its author drew, so any floating
+control lands on some diagram's content. A row costs the height of one button bar per figure
+and removes the class of defect entirely. Zooming may still slide content under the row's edge,
+which is fine — the viewport clips it, and the frame keeps the height it had at 100%, so the
+page never reflows.
+
+The **minimap toggle lives in the toolbar** rather than in a row of its own: a row carrying one
+button read as a stray control, a diagonal away from everything else. The toolbar therefore
+wraps (`flex-wrap: wrap`, on the row and on the bar) so a seventh button cannot overflow a
+narrow column. The minimap _panel_ is the one thing still positioned over the picture, inside
+the diagram row and in the corner opposite the toolbar — the reader opened it deliberately, and
+a map painted under its own control would be half hidden by it. Maximized uses the same two
+rows, with the diagram row taking whatever the control row leaves (`flex: 1; min-height: 0` and
+a `minmax(0, 1fr)` track — an `auto` track floors at max-content, which let a tall diagram size
+the row past the screen and fooled `fitScale` into measuring an overflowing viewport).
 
 **The transform goes on a wrapper, never on the SVG.** `.canvas svg {max-width: 100%; height:
 auto}` derives the SVG's laid-out height from its `viewBox` ratio, so mutating `viewBox` would

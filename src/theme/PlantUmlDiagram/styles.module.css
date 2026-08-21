@@ -54,16 +54,16 @@
  */
 
 /*
- * The frame is three stacked rows — controls, picture, minimap toggle — not one box with
- * chrome floating over it.
+ * The frame is two stacked rows — controls, then picture — not one box with chrome floating
+ * over it.
  *
  * Floating it covered the diagram: the toolbar sat over the top right of every figure and the
  * minimap toggle over the bottom left, and at 100% — the view every reader arrives at — that
  * is exactly where a sequence diagram's first participant and a graph's leftmost node are
  * drawn. No amount of nudging fixes that, because the picture is whatever shape its author
- * drew. A row of its own for each control group means the opening view has nothing painted
- * over it at all. Zooming can still slide content under a row's edge, which is fine: by then
- * the reader is driving, and the alternative is a frame that grows as you zoom.
+ * drew. A row above the picture means the opening view has nothing painted over it at all.
+ * Zooming can still slide content under the row's edge, which is fine: by then the reader is
+ * driving, and the alternative is a frame that grows as you zoom.
  *
  * `position: relative` stays for the maximized overlay's sake, not for the controls.
  */
@@ -132,6 +132,12 @@
  */
 .controls {
   display: flex;
+  /*
+   * Wrapping, in both directions, because the row is the only thing holding the controls now:
+   * in a narrow column the search bar drops below the toolbar rather than squeezing it, and
+   * the toolbar itself breaks across lines rather than overflowing the frame.
+   */
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: flex-start;
   justify-content: flex-end;
@@ -139,6 +145,7 @@
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
   align-items: center;
   padding: 0.25rem;
@@ -334,27 +341,15 @@
 /*
  * Minimap.
  *
- * A small copy of the diagram, bottom-left where the toolbar is top-right, with a rectangle
- * marking the visible part. The copy is laid out at the content's own width and scaled down
- * as one block, so it keeps exactly the geometry of the real canvas and the rectangle's
- * coordinates can be multiplied straight through.
- */
-
-/* The toggle's own row. `flex-start` keeps it button-sized rather than frame-wide. */
-.minimapBar {
-  display: flex;
-  align-self: flex-start;
-  padding: 0.25rem;
-  border: 1px solid var(--ifm-color-emphasis-300);
-  border-radius: var(--ifm-global-radius);
-  background: var(--ifm-background-surface-color);
-}
-
-/*
- * The map itself does still float over the picture, in the bottom-left corner of the diagram
- * row — it is a child of `.stageBody`, so that is the box it is anchored in. A control the
- * reader has explicitly opened may cover the picture; the ones that are simply always there
- * may not, which is why only this one is positioned.
+ * A small copy of the diagram with a rectangle marking the visible part. The copy is laid out
+ * at the content's own width and scaled down as one block, so it keeps exactly the geometry of
+ * the real canvas and the rectangle's coordinates can be multiplied straight through.
+ *
+ * It floats over the picture's bottom-left corner — it is a child of `.stageBody`, so that is
+ * the box it is anchored in, and it is the one control positioned that way. A control the
+ * reader has explicitly opened may cover the picture; the toolbar, which is simply always
+ * there, may not. The corner is deliberately the opposite one from the toolbar that opens it:
+ * a map painted under its own control would be half hidden by it.
  */
 .minimap {
   position: absolute;
@@ -425,7 +420,6 @@
 @media (forced-colors: active) {
   .toolbar,
   .searchBar,
-  .minimapBar,
   .minimap {
     border-color: ButtonBorder;
   }

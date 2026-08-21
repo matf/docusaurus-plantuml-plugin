@@ -497,10 +497,10 @@ export default function PlantUmlDiagram({
           className={zoom.maximized ? `${styles.stage} ${styles.maximized}` : styles.stage}
         >
           {/*
-           * The controls have a row of their own above the picture, rather than floating over
-           * its top-right corner. At 100% — the view every reader arrives at — that corner is
+           * Every control lives in one row above the picture, rather than floating over the
+           * frame's corners. At 100% — the view every reader arrives at — those corners are
            * where a sequence diagram draws its first participant and a graph its leftmost node,
-           * so the toolbar covered the diagram exactly where it was most worth reading.
+           * so the controls covered the diagram exactly where it was most worth reading.
            *
            * The row comes first in the DOM as well as on screen, so tab order follows what the
            * reader sees. Within it, one flex row holds the search bar and the toolbar, so the
@@ -632,6 +632,24 @@ export default function PlantUmlDiagram({
               >
                 {zoom.maximized ? <CloseIcon /> : <MaximizeIcon />}
               </button>
+              {/*
+               * Beside Maximize rather than in a row of its own beneath the picture. A whole
+               * row for one button read as a stray control, and put it a diagonal away from
+               * everything else a reader might press. The map it opens still appears in the
+               * picture's bottom-left corner — that is where a minimap belongs, and it must
+               * not sit under the toolbar that opened it.
+               */}
+              {!sourceOpen && (
+                <button
+                  type="button"
+                  className={styles.toolbarButton}
+                  aria-label={minimapOpen ? 'Hide minimap' : 'Show minimap'}
+                  aria-expanded={minimapOpen}
+                  onClick={() => setMinimapOpen((open) => !open)}
+                >
+                  <MinimapIcon />
+                </button>
+              )}
               {sourceToggle}
               {copyControl}
               {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
@@ -677,9 +695,9 @@ export default function PlantUmlDiagram({
               </div>
             </div>
             {/*
-             * The map is the one control still allowed over the picture: the reader opened it,
-             * and it lives inside the diagram row so it is anchored to the picture it mirrors.
-             * It disappears with that picture when the source view is flipped on — a map of an
+             * The map is the one control allowed over the picture: the reader opened it, and
+             * it lives inside the diagram row so it is anchored to the picture it mirrors. It
+             * disappears with that picture when the source view is flipped on — a map of an
              * invisible diagram would pan nothing anyone can see.
              */}
             {!sourceOpen && minimapOpen && (
@@ -687,24 +705,6 @@ export default function PlantUmlDiagram({
             )}
             {sourceView}
           </div>
-
-          {/*
-           * The bottom row, mirroring the controls at the top: the minimap toggle, sitting
-           * under the picture rather than over its bottom-left corner.
-           */}
-          {!sourceOpen && (
-            <div className={styles.minimapBar}>
-              <button
-                type="button"
-                className={styles.toolbarButton}
-                aria-label={minimapOpen ? 'Hide minimap' : 'Show minimap'}
-                aria-expanded={minimapOpen}
-                onClick={() => setMinimapOpen((open) => !open)}
-              >
-                <MinimapIcon />
-              </button>
-            </div>
-          )}
         </div>
       )}
 
