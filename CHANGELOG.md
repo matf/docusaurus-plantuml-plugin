@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from covering the map. The source view's header no longer reserves a 12rem gutter for a
   toolbar that is no longer above it.
 
+  Released as a **minor** rather than the patch these headings would normally derive: the
+  rendered markup changed shape. The minimap's own bar element is gone, its toggle is a button
+  inside the existing control group, and that group is now the frame's first child rather than
+  its last. Site CSS or tests that reached for those positions need updating; the documented
+  selectors — `[data-plantuml-diagram]`, `div[role="img"] > svg`, `[data-plantuml-zoom]` and the
+  control group's accessible name — are all unchanged.
+
 ## [1.5.2] - 2026-08-20
 
 ### Changed
