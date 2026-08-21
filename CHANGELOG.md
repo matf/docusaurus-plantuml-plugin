@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-21
+
 ### Fixed
 
 - **The zoom controls no longer cover the diagram.** The toolbar was painted over the frame's
@@ -568,7 +570,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.5.2...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.4.0...v1.5.0
