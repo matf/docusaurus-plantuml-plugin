@@ -381,6 +381,26 @@ test.describe('zoom and pan', () => {
     await page.keyboard.press('Escape');
   });
 
+  test('dragging never leaves the diagram text selected', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    const viewport = page.locator(viewportSelector).first();
+    const box = await rectOf(viewport);
+
+    // Press on a label and drag out past the frame — the gesture that used to anchor a
+    // selection on the SVG text and then keep extending it across the page, leaving a
+    // highlight that the swallowed end-of-drag click could not clear.
+    const label = await rectOf(figure.locator(`${DIAGRAM_SVG} text`).first());
+    await page.mouse.move(label.x + label.width / 2, label.y + label.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width + 200, box.y + box.height + 120, {steps: 12});
+    await page.mouse.up();
+
+    expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
+  });
+
   test('is operable from the keyboard', async ({page}) => {
     await page.goto('docs/zoom');
     await waitForDiagrams(page, 2);

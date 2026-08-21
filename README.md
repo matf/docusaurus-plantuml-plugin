@@ -593,6 +593,14 @@ diagram that fits its frame whole. Maximize a modest diagram and it is fitted in
 the screen with room to spare; that space is now yours to move it into, rather than a grab
 cursor that did nothing.
 
+Text inside a zoomable diagram is **not selectable**, because the same box is the drag surface:
+the browser anchors a selection on the first press, before a drag can be told apart from a
+click, so dragging used to paint the labels blue and leave them that way. The text is still
+reachable everywhere it is actually read — the `</>` source view with its Copy button, the
+diagram search, and the browser's find-in-page. A diagram with `zoom=false` is not a drag
+surface and stays selectable, and a site that wants the selection back everywhere can say
+`[data-plantuml-diagram] svg {user-select: text}`.
+
 The rule in both directions is that the diagram stays reachable: it can never be dragged so far
 that an edge comes inside the viewport, and never so far that it leaves the viewport altogether.
 Where there is no room — a picture exactly as wide as its frame — it does not budge on that axis,

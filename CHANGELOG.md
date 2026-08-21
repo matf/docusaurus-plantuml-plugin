@@ -25,6 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Note that *fitting* makes one axis flush with the screen by construction, so a freshly
   maximized diagram slides only along the other one. Zoom out a step and it moves both ways.
 
+- **Dragging no longer marks the diagram's text.** `pointerdown` cannot `preventDefault()`
+  without breaking focus, links and double-click, so the browser anchored a text selection on
+  the first press — before the 3px drag threshold could tell a drag from a click. The labels
+  flashed blue for the whole gesture, a drag past the frame kept extending the selection across
+  the page, and it could not be cleared by clicking, because the click that ends a drag is the
+  one the component swallows so a drag over a link does not follow it.
+
+  The canvas inside a zoom viewport is now `user-select: none`, which removes the anchor rather
+  than trying to undo its effects. The text stays reachable where it is actually read: the `</>`
+  source view with Copy, the diagram search, and the browser's find-in-page. A diagram with
+  `zoom=false` is not a drag surface and is untouched; a site that wants the selection back can
+  say `[data-plantuml-diagram] svg {user-select: text}`.
+
 ## [1.6.0] - 2026-08-21
 
 ### Fixed
