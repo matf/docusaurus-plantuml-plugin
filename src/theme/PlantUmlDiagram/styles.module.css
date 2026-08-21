@@ -90,13 +90,30 @@
 
 .viewport[data-plantuml-dragging='true'] {
   cursor: grabbing;
-  user-select: none;
 }
 
-/* Inside the viewport the SVG must not be clipped by the old scroll container. */
+/*
+ * Inside the viewport the SVG must not be clipped by the old scroll container — and its text
+ * is not selectable, because this box is a drag surface.
+ *
+ * Pressing on SVG text used to anchor a native selection: `pointerdown` deliberately does not
+ * `preventDefault()`, so that focus, links and double-click keep working, which means the
+ * browser starts selecting before the 3px drag threshold has been crossed. Marking the box
+ * unselectable once dragging began was too late — the anchor already existed, the labels
+ * flashed blue for the whole gesture, a drag past the edge kept extending the selection into
+ * the page, and the click that would normally collapse it is the very click a drag swallows.
+ * Removing the anchor removes all of that at once.
+ *
+ * The text stays reachable everywhere it was actually read: the `</>` source view (with Copy),
+ * this component's own search, and the browser's find-in-page, none of which need a selection.
+ * A diagram with `zoom=false` is not a drag surface and is left alone. A site that wants the
+ * old behaviour can say `[data-plantuml-diagram] svg {user-select: text}` — an attribute
+ * selector, so no hashed class name is needed.
+ */
 .viewport .canvas {
   display: block;
   overflow: visible;
+  user-select: none;
 }
 
 .layer {

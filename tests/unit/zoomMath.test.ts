@@ -144,12 +144,24 @@ describe('clampTransform', () => {
     contentHeight: 300,
   };
 
-  it('left-aligns content that fits, whatever pan was requested', () => {
-    const clamped = clampTransform({k: 1, x: 120, y: 80}, bounds);
-    expect(clamped).toEqual({k: 1, x: 0, y: 0});
+  it('pins content that exactly fills the viewport, whatever pan was requested', () => {
+    // No slack on either axis: the picture is the viewport, so there is nowhere to move it.
+    expect(clampTransform({k: 1, x: 120, y: 80}, bounds)).toEqual({k: 1, x: 0, y: 0});
+    expect(clampTransform({k: 1, x: -120, y: -80}, bounds)).toEqual({k: 1, x: 0, y: 0});
   });
 
-  it('left-aligns content smaller than the viewport', () => {
+  it('lets content smaller than the viewport be moved into the space beside it', () => {
+    // At half scale the picture is 200x150 in a 400x300 viewport, leaving 200x150 of slack.
+    // Dragging it into that space is the whole point: a grab cursor that cannot move the
+    // picture is a lie, and a fitted diagram on a maximized screen has room to spare.
+    expect(clampTransform({k: 0.5, x: 120, y: 80}, bounds)).toEqual({k: 0.5, x: 120, y: 80});
+    expect(clampTransform({k: 0.5, x: 200, y: 150}, bounds)).toEqual({k: 0.5, x: 200, y: 150});
+  });
+
+  it('never lets content that fits leave the viewport', () => {
+    // Neither past the far edge...
+    expect(clampTransform({k: 0.5, x: 9999, y: 9999}, bounds)).toEqual({k: 0.5, x: 200, y: 150});
+    // ...nor back off the near one, which is where the diagram opens.
     expect(clampTransform({k: 0.5, x: -50, y: -50}, bounds)).toEqual({k: 0.5, x: 0, y: 0});
   });
 
@@ -158,6 +170,23 @@ describe('clampTransform', () => {
     // within [-400, 0] horizontally and [-300, 0] vertically.
     expect(clampTransform({k: 2, x: 100, y: 100}, bounds)).toEqual({k: 2, x: 0, y: 0});
     expect(clampTransform({k: 2, x: -9999, y: -9999}, bounds)).toEqual({k: 2, x: -400, y: -300});
+  });
+
+  it('lets a small picture keep travelling once zooming makes it overflow', () => {
+    // 200 wide in a 400 viewport at 3x is 600: it overflows, but only by 200. Clamping to the
+    // picture would stop the translation at -200 and yank it back mid-gesture, exactly when
+    // focal zoom is asking it to keep tracking the pointer. The backward limit is therefore
+    // measured against a content size floored at the viewport's, which allows -800.
+    const small: Bounds = {
+      viewportWidth: 400,
+      viewportHeight: 300,
+      contentWidth: 200,
+      contentHeight: 150,
+    };
+    expect(clampTransform({k: 3, x: -500, y: -400}, small)).toEqual({k: 3, x: -500, y: -400});
+    expect(clampTransform({k: 3, x: -9999, y: -9999}, small)).toEqual({k: 3, x: -800, y: -600});
+    // Forwards there is no empty space left to move into, so that end is 0.
+    expect(clampTransform({k: 3, x: 50, y: 50}, small)).toEqual({k: 3, x: 0, y: 0});
   });
 
   it('leaves a translation that is already within bounds alone', () => {
@@ -171,9 +200,12 @@ describe('clampTransform', () => {
       contentWidth: 1600,
       contentHeight: 100,
     };
-    // Horizontally pannable, vertically pinned, in the same call.
+    // 1600x100 in a 400x300 viewport: the width overflows by 1200, the height leaves 200 of
+    // slack. One axis is therefore pannable into negative translation while the other moves
+    // only into positive — in the same call.
     expect(clampTransform({k: 1, x: -500, y: -40}, wide)).toEqual({k: 1, x: -500, y: 0});
-    expect(clampTransform({k: 1, x: -5000, y: 40}, wide)).toEqual({k: 1, x: -1200, y: 0});
+    expect(clampTransform({k: 1, x: -5000, y: 40}, wide)).toEqual({k: 1, x: -1200, y: 40});
+    expect(clampTransform({k: 1, x: -5000, y: 9999}, wide)).toEqual({k: 1, x: -1200, y: 200});
   });
 
   it('pins everything when the content has not been measured yet', () => {

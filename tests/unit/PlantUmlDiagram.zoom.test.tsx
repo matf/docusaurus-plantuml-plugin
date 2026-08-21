@@ -461,6 +461,71 @@ describe('keyboard', () => {
   });
 });
 
+describe('moving a diagram that fits', () => {
+  /**
+   * A 200x150 picture in a 400x600 viewport: 200 wide and 450 tall of empty space beside it.
+   *
+   * jsdom lays nothing out, so the sizes the hook measures are stubbed directly — the same
+   * technique the fit tests above use. The geometry itself is proved in `zoomMath.test.ts`;
+   * what these check is that the component feeds the clamp the *measured* picture, so the
+   * slack is real and a drag is not silently thrown away.
+   */
+  function stubFittedSizes(): void {
+    Object.defineProperty(viewport(), 'clientWidth', {configurable: true, value: 400});
+    Object.defineProperty(viewport(), 'clientHeight', {configurable: true, value: 600});
+    Object.defineProperty(layer(), 'offsetWidth', {configurable: true, value: 200});
+    Object.defineProperty(layer(), 'offsetHeight', {configurable: true, value: 150});
+  }
+
+  /** A press, a move past the drag threshold, and a release, which flushes synchronously. */
+  function drag(dx: number, dy: number): void {
+    act(() => {
+      fireEvent.pointerDown(viewport(), {
+        pointerId: 1,
+        isPrimary: true,
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+      });
+      fireEvent.pointerMove(viewport(), {pointerId: 1, clientX: 100 + dx, clientY: 100 + dy});
+      fireEvent.pointerUp(viewport(), {pointerId: 1, clientX: 100 + dx, clientY: 100 + dy});
+    });
+  }
+
+  it('drags into the empty space beside it', async () => {
+    await renderReady();
+    stubFittedSizes();
+
+    drag(150, 100);
+
+    // The grab cursor promised this and, until the clamp learned about positive slack,
+    // delivered nothing: content that fitted was pinned at the origin.
+    expect(layer().style.transform).toBe('translate(150px, 100px) scale(1)');
+  });
+
+  it('cannot be dragged out of its viewport', async () => {
+    await renderReady();
+    stubFittedSizes();
+
+    drag(9999, 9999);
+    expect(layer().style.transform).toBe('translate(200px, 450px) scale(1)');
+
+    drag(-9999, -9999);
+    // Back to where it opened, and no further: the near edge is a wall too.
+    expect(layer().style.transform).toBe('translate(0px, 0px) scale(1)');
+  });
+
+  it('is put back by Reset', async () => {
+    await renderReady();
+    stubFittedSizes();
+    drag(150, 100);
+
+    act(() => screen.getByRole('button', {name: 'Reset zoom'}).click());
+
+    expect(layer().style.transform).toBe('translate(0px, 0px) scale(1)');
+  });
+});
+
 describe('not resetting the view', () => {
   it('keeps the zoom across a re-render that changes nothing about the picture', async () => {
     // Resets must have exactly one owner. When the listener effect also reset on attach, any

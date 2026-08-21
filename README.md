@@ -550,7 +550,7 @@ bottom-left corner: the reader asked for it, and it closes with its own ✕.
 | ----------------------------------- | -------------------------------------------------------------- |
 | Plain scroll wheel                  | Scrolls the page. Never intercepted.                           |
 | **Ctrl** + wheel, or trackpad pinch | Zooms about the pointer                                        |
-| Drag                                | Pans, once zoomed in                                           |
+| Drag                                | Moves the diagram, at any zoom level                           |
 | One finger on a touchscreen         | Scrolls the page                                               |
 | Two-finger pinch on a touchscreen   | The browser's own page zoom                                    |
 | Toolbar buttons                     | Zoom out, zoom in, reset, maximize — plus fit, while maximized |
@@ -581,10 +581,31 @@ working, and `Tab` always moves on — the diagram is never a keyboard trap.
 
 The toolbar buttons and the keyboard zoom about the **top-left corner** of the viewport, while
 the wheel zooms about the **pointer**. That difference is deliberate: a diagram rarely fills its
-viewport, and one that fits is left-aligned, so the empty space sits to its right and below.
+viewport, and one that fits opens at the origin, so the empty space sits to its right and below.
 Zooming about the centre would scale that empty space and push the diagram off the top and left
 edges — most visibly when maximized. Anchoring at the top-left grows the diagram into the empty
 space instead and keeps it visible as long as possible.
+
+### Moving the diagram
+
+Dragging moves the diagram **whatever the zoom level** — including a small one, and including a
+diagram that fits its frame whole. Maximize a modest diagram and it is fitted into a corner of
+the screen with room to spare; that space is now yours to move it into, rather than a grab
+cursor that did nothing.
+
+Text inside a zoomable diagram is **not selectable**, because the same box is the drag surface:
+the browser anchors a selection on the first press, before a drag can be told apart from a
+click, so dragging used to paint the labels blue and leave them that way. The text is still
+reachable everywhere it is actually read — the `</>` source view with its Copy button, the
+diagram search, and the browser's find-in-page. A diagram with `zoom=false` is not a drag
+surface and stays selectable, and a site that wants the selection back everywhere can say
+`[data-plantuml-diagram] svg {user-select: text}`.
+
+The rule in both directions is that the diagram stays reachable: it can never be dragged so far
+that an edge comes inside the viewport, and never so far that it leaves the viewport altogether.
+Where there is no room — a picture exactly as wide as its frame — it does not budge on that axis,
+so a wide, short diagram still pans sideways while staying put vertically. The arrow keys move it
+the same way, and **Reset** puts it back where it opened.
 
 Scale is limited to 0.25×–8×, and the view resets to 100% whenever the diagram source or the
 site colour mode changes.

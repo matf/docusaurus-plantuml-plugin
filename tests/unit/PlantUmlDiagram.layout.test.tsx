@@ -183,6 +183,15 @@ describe('the stylesheet keeps the controls out of the picture', () => {
     expect(declarations('.minimap')).toMatch(/position:\s*absolute/);
   });
 
+  it('makes the drag surface unselectable, so a drag cannot mark the diagram text', () => {
+    // `pointerdown` cannot `preventDefault()` without breaking focus, links and double-click,
+    // so the browser anchors a selection before the drag threshold is even crossed. Removing
+    // the anchor is what stops a drag painting the labels blue and leaving them that way.
+    expect(declarations('.viewport .canvas')).toMatch(/user-select:\s*none/);
+    // Only in the zoom viewport: a diagram with `zoom=false` is not a drag surface.
+    expect(declarations('.canvas')).not.toMatch(/user-select:/);
+  });
+
   it('stops reserving a toolbar gutter in the source view header', () => {
     // The bar used to carry `padding-right: 12rem` to dodge the floating toolbar.
     expect(declarations('.sourceViewBar')).not.toMatch(/12rem/);
