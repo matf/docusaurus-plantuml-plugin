@@ -585,10 +585,27 @@ its JSX `onWheel` prop passively at the root, so `preventDefault()` from there i
 no-op. Key handlers do use the JSX prop, because React key events are not passive.
 
 **Buttons and keys anchor zoom at the viewport's top-left; the wheel anchors at the pointer.**
-`clampTransform` left-aligns content that fits, so a diagram smaller than its viewport sits at
-the origin with empty space to its right and below. Centre-anchored zoom scales that empty
-space and walks the diagram off the top and left edges. Anchoring at `(0, 0)` makes the
-translation `t' = t · ratio`, which leaves a left-aligned diagram exactly where it is.
+A diagram smaller than its viewport opens at the origin, with empty space to its right and
+below. Centre-anchored zoom scales that empty space and walks the diagram off the top and left
+edges. Anchoring at `(0, 0)` makes the translation `t' = t · ratio`, which leaves a diagram
+sitting at the origin exactly where it is.
+
+**The clamp's two ends answer different questions.** `clampTransform` bounds each axis
+independently, and the two limits are deliberately measured against different things.
+
+_Forwards_ the limit is the empty space beside the picture, `viewport - content · k`: a diagram
+that fits can be moved through that space and no further, so it never leaves the viewport. This
+end used to be pinned at `0`, which is why a fitted diagram — most visibly a maximized one,
+sitting in the corner of a large screen — had a grab cursor that moved nothing.
+
+_Backwards_ the content size is floored at the viewport's before scaling. That looks arbitrary
+until you zoom: focal zoom has to hold the point under the pointer, and a picture narrower than
+its frame reaches a scale where it overflows while the pointer is still asking it to travel
+further left than a flush right edge would allow. Clamping to the picture there yanks it
+sideways mid-gesture — an end-to-end test measures exactly that drift. The floor buys the
+fidelity for the price of some empty space at the right while zoomed, which is the trade this
+component has always made. Removing it wholesale while adding the forward limit reintroduced a
+134px drift in that test; the fix was to keep it on the backward end alone.
 
 **Maximizing is an in-page overlay, not the Fullscreen API.** `requestFullscreen()` fullscreens
 the whole browser window in Firefox rather than presenting the element, and its `::backdrop` is

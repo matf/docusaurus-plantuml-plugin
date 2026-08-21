@@ -331,6 +331,56 @@ test.describe('zoom and pan', () => {
     expect(clamped.x).toBeLessThanOrEqual(box.x + 1);
   });
 
+  test('a diagram that fits can be dragged around the space beside it', async ({page}) => {
+    await page.goto('docs/zoom');
+    await waitForDiagrams(page, 2);
+
+    const figure = page.locator(zoomable).first();
+    // Maximized is where this matters most: the diagram sits in the corner of a screen with
+    // room to spare, and until now the grab cursor did nothing there.
+    await figure.getByRole('button', {name: 'Maximize diagram'}).click();
+    await expect(figure).toHaveAttribute('data-plantuml-maximized', 'true');
+
+    // One step out from the opening fit. Fitting makes the constraining axis flush with the
+    // screen by construction, so a *fitted* diagram can only slide along the other one; a
+    // reader who zooms out — the state this was reported from — has room on both.
+    await figure.getByRole('button', {name: 'Zoom out'}).click();
+    await expect.poll(() => zoomLevel(page)).toBeLessThan(1);
+
+    const layer = layerOf(figure);
+    const viewport = page.locator(viewportSelector).first();
+    const box = await rectOf(viewport);
+    const before = await rectOf(layer);
+    // Fitted means the picture is no wider than the screen; there is slack to drag into.
+    expect(before.width).toBeLessThanOrEqual(box.width + 1);
+
+    const from = {x: box.x + box.width * 0.3, y: box.y + box.height * 0.3};
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 120, from.y + 80, {steps: 10});
+    await page.mouse.up();
+
+    const after = await rectOf(layer);
+    expect(after.x, 'the diagram should follow the pointer right').toBeGreaterThan(before.x + 50);
+    expect(after.y, 'the diagram should follow the pointer down').toBeGreaterThan(before.y + 30);
+
+    // And it still cannot be pushed out of the viewport: drag far past the far corner.
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 4000, from.y + 4000, {steps: 15});
+    await page.mouse.up();
+
+    const clamped = await rectOf(layer);
+    expect(clamped.x + clamped.width).toBeLessThanOrEqual(box.x + box.width + 1);
+    expect(clamped.y + clamped.height).toBeLessThanOrEqual(box.y + box.height + 1);
+
+    // Reset puts it back where it opened.
+    await figure.getByRole('button', {name: 'Reset zoom'}).click();
+    await expect.poll(async () => Math.round((await rectOf(layer)).x - box.x)).toBe(0);
+
+    await page.keyboard.press('Escape');
+  });
+
   test('is operable from the keyboard', async ({page}) => {
     await page.goto('docs/zoom');
     await waitForDiagrams(page, 2);

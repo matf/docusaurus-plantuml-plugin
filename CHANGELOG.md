@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A diagram that fits can now be dragged around the space beside it.** The viewport has always
+  shown a grab cursor, but content that fitted was pinned at the origin, so on anything short of
+  a magnified diagram the cursor promised something that did not happen. It was most obvious
+  maximized: a modest diagram is fitted into the top-left corner of the screen with room to
+  spare, and none of that room could be used.
+
+  `clampTransform` now bounds each axis by the empty space beside the picture,
+  `viewport - content × scale`, instead of pinning content that fits at the origin. The diagram
+  moves through that space and no further, so it can never leave the viewport, and a magnified
+  one still cannot be dragged until an edge comes inside it. Axes stay independent, so a wide,
+  short diagram pans sideways while moving only through what little vertical room it has, and
+  **Reset** puts everything back.
+
+  Note that *fitting* makes one axis flush with the screen by construction, so a freshly
+  maximized diagram slides only along the other one. Zoom out a step and it moves both ways.
+
 ## [1.6.0] - 2026-08-21
 
 ### Fixed

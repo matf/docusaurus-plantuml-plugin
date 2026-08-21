@@ -69,27 +69,46 @@ export function panBy(transform: Transform, dx: number, dy: number): Transform {
 }
 
 /**
- * Keeps the diagram reachable: an edge can never be dragged inside the viewport, and content
- * that fits is left-aligned — matching the `justify-content: flex-start` behaviour diagrams
- * had before they became zoomable.
+ * Keeps the diagram reachable, in both directions, one axis at a time.
  *
- * The axes are clamped independently, so a wide, short diagram pans horizontally while staying
- * pinned vertically.
+ * The two ends of the range answer different questions, and are deliberately measured against
+ * different things — see {@link clampAxis}. Forwards, the limit is the *empty space* beside the
+ * picture: a diagram that fits can be moved through it but never out of the viewport. Content
+ * that fits used to be pinned at `0` outright, which left the reader with a grab cursor that
+ * moved nothing — most obviously while maximized, where a fitted diagram sits in a corner of a
+ * screen with room to spare. Backwards, the limit keeps a magnified diagram from being dragged
+ * until an edge comes inside the viewport.
+ *
+ * The axes are clamped independently, so a wide, short diagram pans horizontally while moving
+ * only through the little vertical space it has.
  */
 export function clampTransform(transform: Transform, bounds: Bounds): Transform {
-  const scaledWidth = bounds.contentWidth * transform.k;
-  const scaledHeight = bounds.contentHeight * transform.k;
+  return {
+    k: transform.k,
+    x: clampAxis(transform.x, bounds.viewportWidth, bounds.contentWidth, transform.k),
+    y: clampAxis(transform.y, bounds.viewportHeight, bounds.contentHeight, transform.k),
+  };
+}
 
-  const x =
-    scaledWidth <= bounds.viewportWidth
-      ? 0
-      : clamp(transform.x, bounds.viewportWidth - scaledWidth, 0);
-  const y =
-    scaledHeight <= bounds.viewportHeight
-      ? 0
-      : clamp(transform.y, bounds.viewportHeight - scaledHeight, 0);
-
-  return {k: transform.k, x, y};
+/**
+ * One axis of the clamp.
+ *
+ * **Forwards** (positive translation) the picture may travel exactly as far as the empty space
+ * beside it, `viewport - content * k`, and no further — so it never leaves the viewport. Once
+ * the content overflows there is no empty space and the limit is `0`.
+ *
+ * **Backwards** the content size is floored at the viewport's *before* scaling. That looks odd
+ * until you zoom: focal zoom must hold the point under the pointer, and a picture narrower than
+ * its frame reaches a scale where it overflows while the pointer is still asking it to travel
+ * further left than a flush right edge allows. Clamping to the picture there yanks it sideways
+ * mid-gesture. The floor buys that fidelity for the price of some empty space at the right
+ * while zoomed, which is the trade this component has always made — it is only the *forward*
+ * limit, above, that had to stop being measured this way for a fitted diagram to move at all.
+ */
+function clampAxis(value: number, viewport: number, content: number, k: number): number {
+  const forward = Math.max(0, viewport - content * k);
+  const backward = Math.min(0, viewport - Math.max(content, viewport) * k);
+  return clamp(value, backward, forward);
 }
 
 /** `WheelEvent.deltaMode` constants, which jsdom does not define. */
