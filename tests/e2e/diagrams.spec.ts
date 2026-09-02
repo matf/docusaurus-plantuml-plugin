@@ -133,6 +133,35 @@ test.describe('client-side PlantUML rendering', () => {
     expect(seen.pageErrors, 'a bad diagram must not crash the page').toEqual([]);
   });
 
+  /**
+   * The end-to-end half of the engine size-ceiling patch.
+   *
+   * Unpatched, `@plantuml/core` refuses anything over 4096 points and this page would show an
+   * error panel instead of a diagram. Nothing but a real browser loading the real emitted
+   * asset proves the patched engine is what actually gets served and that it still runs.
+   */
+  test('renders a diagram taller than the engine’s original 4096-point ceiling', async ({page}) => {
+    const seen = monitor(page, ORIGIN);
+    await page.goto('docs/large-diagram');
+
+    const figure = page.locator(diagram).first();
+    await expect(figure).toHaveAttribute('data-plantuml-status', 'ready', {timeout: 90_000});
+
+    const svg = figure.locator(DIAGRAM_SVG);
+    await expect(svg).toHaveCount(1);
+    const height = await svg.evaluate((node) =>
+      Number.parseFloat(node.getAttribute('height') ?? '0'),
+    );
+    expect(height, 'the diagram must actually exceed the original ceiling').toBeGreaterThan(4096);
+    expect(height, 'and stay under the patched one').toBeLessThan(32_768);
+
+    const text = await svg.textContent();
+    expect(text).toContain('Step01');
+    expect(text).toContain('Step60');
+
+    expect(seen.pageErrors).toEqual([]);
+  });
+
   test('serves every runtime asset from the configured baseUrl', async ({page}) => {
     const seen = monitor(page, ORIGIN);
     await page.goto('docs/plantuml');
@@ -144,7 +173,7 @@ test.describe('client-side PlantUML rendering', () => {
         true,
       );
       // Version-namespaced so an engine upgrade cannot be served from a stale cache.
-      expect(url).toMatch(/\/assets\/plantuml-client-\d+\.\d+\.\d+\//);
+      expect(url).toMatch(/\/assets\/plantuml-client-\d+\.\d+\.\d+-max32768\//);
     }
   });
 

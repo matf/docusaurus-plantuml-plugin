@@ -1043,7 +1043,7 @@ Failures are classified internally as one of:
 | Kind        | Cause                                                                                                                                                                                  |
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `load`      | `viz-global.js` or `plantuml.js` could not be fetched, timed out, or was not the expected module (usually a proxy or service worker returning the wrong file).                         |
-| `engine`    | The engine threw, or its output could not be used at all.                                                                                                                              |
+| `engine`    | The engine threw, or its output could not be used at all. Includes `Diagram too large for browser rendering: WxH (max 32768)` — see [Diagram size](#diagram-size).                     |
 | `diagram`   | The source is not valid PlantUML.                                                                                                                                                      |
 | `syntax`    | The source is not valid DOT. Carries Graphviz's own diagnostic, including the line number.                                                                                             |
 | `too-large` | A DOT source exceeded `graphviz.maxSourceBytes`.                                                                                                                                       |
@@ -1065,25 +1065,61 @@ The two engines report invalid source very differently:
 - **Invalid DOT is reported as structured data**, so the panel shows Graphviz's own message
   verbatim — `syntax error in line 3 near '}'` — with no heuristics involved.
 
+## Diagram size
+
+`@plantuml/core` refuses to serialize a diagram wider or taller than a fixed number of
+PlantUML points, reporting it through its error callback:
+
+```text
+Diagram too large for browser rendering: 78x12916 (max 4096)
+```
+
+Upstream that limit is **4096**. This plugin patches the engine it serves and raises it to
+**32768**, so diagrams that the stock engine rejects render normally here. It is not
+configurable — one constant, applied on every build.
+
+The limit is not something a diagram can talk its way around, which is why patching it was
+worth doing. Measured against the engine:
+
+| Attempt                   | Effect                                                   |
+| ------------------------- | -------------------------------------------------------- |
+| `scale 0.3`               | **none** — the check reads the pre-scale dimensions      |
+| `skinparam dpi 40`        | **none** — `dpi` affects raster output, not this measure |
+| `left to right direction` | none; it transposes width and height                     |
+| `skinparam ranksep 5`     | works — it genuinely shrinks the layout                  |
+
+If you still hit the ceiling at 32768, the levers that work are the ones that make the
+diagram smaller: fewer nodes and edges, tighter `skinparam ranksep`/`nodesep`, a smaller
+`skinparam defaultFontSize`, or splitting one diagram into several fences.
+
+**A very large diagram is not free.** A 30 000-point diagram is a multi-hundred-KB SVG, and
+both the error detection and the DOMPurify sanitization parse it synchronously on the main
+thread. Such a diagram can visibly stall the tab while it lands, and may need
+`renderTimeoutMs` raised above its 20 s default. See
+[ADR 0007](docs/adr/0007-engine-size-ceiling-patch.md).
+
 ## `baseUrl` support
 
 The runtime assets are emitted into
 
 ```text
-<baseUrl>assets/plantuml-client-<coreVersion>/
+<baseUrl>assets/plantuml-client-<coreVersion>-max32768/
 ```
 
 and resolved in the browser through Docusaurus' own `useBaseUrl()`. A site deployed at
 `baseUrl: '/plantuml-test/'` therefore fetches:
 
 ```text
-/plantuml-test/assets/plantuml-client-1.2026.6/viz-global.js
-/plantuml-test/assets/plantuml-client-1.2026.6/plantuml.js
+/plantuml-test/assets/plantuml-client-1.2026.6-max32768/viz-global.js
+/plantuml-test/assets/plantuml-client-1.2026.6-max32768/plantuml.js
 ```
 
 No path is hard-coded to the site root, so project-pages deployments and reverse-proxied
 subpaths work without configuration. The engine version is part of the directory name, so an
-upgrade changes the URL and stale caches are defeated automatically. The bundled example site
+upgrade changes the URL and stale caches are defeated automatically. The `-max32768` segment
+is part of the same identity: what is served is a _patched_ engine (see
+[Diagram size](#diagram-size)), and a reader holding a cached copy from a plugin version that
+patched differently must not be handed it from the same URL. The bundled example site
 deploys under a non-root `baseUrl` precisely so this path is exercised on every build.
 
 ## Browser compatibility
@@ -1430,6 +1466,16 @@ too and was rejected: it carries one person's account reach and expires on a cal
 - **One PlantUML diagram renders at a time.** The PlantUML engine has module-level shared
   state, so a page with many large diagrams renders them sequentially. This is a correctness
   requirement, not a tuning knob. Graphviz has no such constraint and is not queued.
+- **PlantUML diagrams are capped at 32768 points in each dimension.** The bundled engine has
+  a hard ceiling with no option behind it; the plugin patches it up from the stock 4096, but
+  it cannot be removed or configured. Past that, the diagram itself has to get smaller — see
+  [Diagram size](#diagram-size). The raised ceiling also means a genuinely enormous diagram
+  now renders instead of failing fast, and both the error detection and the sanitizer parse
+  the resulting SVG synchronously, so it can stall the tab on its way in.
+- **A `@plantuml/core` release that changes the shape of that ceiling fails the build.** The
+  patch is anchored on two literals whose occurrence counts are verified before anything is
+  rewritten, and the plugin refuses to guess. The unit suite runs the patcher against the
+  installed engine, so a dependency bump that broke it goes red here rather than in your build.
 - **Graphviz rendering blocks the main thread.** Viz.js lays out synchronously. A 300-edge
   graph takes ~26 ms, but a 3 000-edge graph takes ~2.25 s and visibly freezes the page;
   `graphviz.maxSourceBytes` is the guard. Rendering in a Web Worker would remove the ceiling
@@ -1452,7 +1498,7 @@ too and was rejected: it carries one person's account reach and expires on a cal
 ### Diagrams stay on "Loading PlantUML runtime…" and the assets 404 under a subpath
 
 Open the network tab and check the failing URL. It should be
-`<baseUrl>assets/plantuml-client-<version>/viz-global.js`. If the request goes to
+`<baseUrl>assets/plantuml-client-<version>-max32768/viz-global.js`. If the request goes to
 `/assets/...` when your site lives at `/docs/`, the site's `baseUrl` is wrong — not the
 plugin's paths, which are always resolved through `useBaseUrl()`.
 
@@ -1476,7 +1522,7 @@ served as `text/plain`, `application/octet-stream` or `text/html`. The console s
 MIME type checking error. Check with:
 
 ```bash
-curl -I https://example.com/your-base-url/assets/plantuml-client-1.2026.6/plantuml.js
+curl -I https://example.com/your-base-url/assets/plantuml-client-1.2026.6-max32768/plantuml.js
 ```
 
 The `content-type` must be a JavaScript type (`text/javascript` or

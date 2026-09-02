@@ -141,7 +141,7 @@ describe('plugin factory', () => {
 
     expect(published).toMatchObject({
       options: expect.objectContaining({theme: 'dark', languages: ['plantuml', 'puml']}),
-      assetsDir: expect.stringMatching(/^assets\/plantuml-client-\d+\.\d+\.\d+$/),
+      assetsDir: expect.stringMatching(/^assets\/plantuml-client-\d+\.\d+\.\d+-max32768$/),
       coreVersion: expect.stringMatching(/^\d+\.\d+\.\d+$/),
     });
   });
