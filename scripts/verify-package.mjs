@@ -45,6 +45,7 @@ const REQUIRED_FILES = [
   'dist/index.d.cts',
   'dist/options.js',
   'dist/options.d.ts',
+  'dist/enginePatch.js',
   'dist/runtime/renderer.js',
   'dist/runtime/queue.js',
   'dist/runtime/cache.js',

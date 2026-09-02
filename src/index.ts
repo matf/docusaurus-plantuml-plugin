@@ -11,7 +11,13 @@ import CopyWebpackPlugin from 'copy-webpack-plugin';
 import type {WebpackPluginInstance} from 'webpack';
 
 import {locatePlantUmlCore} from './assets.js';
-import {assetsDirForVersion, DEFAULT_PLUGIN_ID, PLUGIN_NAME} from './constants.js';
+import {
+  assetsDirForVersion,
+  DEFAULT_PLUGIN_ID,
+  PLANTUML_MODULE_FILENAME,
+  PLUGIN_NAME,
+} from './constants.js';
+import {resolvePatchedEngine} from './enginePatch.js';
 import {
   resolveOptions,
   type PlantUmlPluginOptions,
@@ -131,8 +137,18 @@ export default function plantumlPlugin(
       if (isServer) {
         return {};
       }
+      // The engine is patched to raise its 4096-point diagram ceiling, so what is emitted is
+      // a generated file rather than the vendored one. It happens here rather than in the
+      // plugin factory so that `swizzle`, `write-translations` and the server compilation do
+      // not each pay to read and rewrite 7 MB for output they never emit.
+      const engine = resolvePatchedEngine({
+        vendoredPath: path.join(core.packageDir, PLANTUML_MODULE_FILENAME),
+        coreVersion: core.version,
+        siteDir: context.siteDir,
+        cacheDir: context.generatedFilesDir,
+      });
       const patterns: CopyPattern[] = core.files.map((absolutePath) => ({
-        from: absolutePath,
+        from: path.basename(absolutePath) === PLANTUML_MODULE_FILENAME ? engine : absolutePath,
         to: `${assetsDir}/[name][ext]`,
         // These files are already minified upstream; re-processing 8 MB is wasted work.
         info: {minimized: true},

@@ -1,13 +1,29 @@
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
-import {describe, expect, it, vi} from 'vitest';
+import {afterAll, describe, expect, it, vi} from 'vitest';
 
 import type {ConfigureWebpackUtils} from '@docusaurus/types';
 
 import plantumlPlugin, {createCopyPlugin} from '../../src/index.js';
 import {locatePlantUmlCore} from '../../src/assets.js';
 
-const context = {siteDir: '/site', siteConfig: {baseUrl: '/plantuml-test/'}} as never;
+/**
+ * A real directory, because `configureWebpack` writes the patched engine into the site's
+ * generated-files directory before it can name it in a copy pattern.
+ */
+const siteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plantuml-webpack-'));
+
+afterAll(() => {
+  fs.rmSync(siteDir, {recursive: true, force: true});
+});
+
+const context = {
+  siteDir,
+  generatedFilesDir: path.join(siteDir, '.docusaurus'),
+  siteConfig: {baseUrl: '/plantuml-test/'},
+} as never;
 
 const webpackBundler = {name: 'webpack' as const, instance: {} as never};
 
@@ -43,12 +59,26 @@ describe('runtime asset emission', () => {
     const copyPlugin = result.plugins[0] as {patterns: Array<{from: string; to: string}>};
     expect(copyPlugin.patterns).toHaveLength(2);
     for (const pattern of copyPlugin.patterns) {
-      expect(pattern.to).toMatch(/^assets\/plantuml-client-\d+\.\d+\.\d+\/\[name]\[ext]$/);
+      expect(pattern.to).toMatch(/^assets\/plantuml-client-\d+\.\d+\.\d+-max32768\/\[name]\[ext]$/);
     }
     expect(copyPlugin.patterns.map((p) => p.from.split('/').pop())).toEqual([
       'viz-global.js',
       'plantuml.js',
     ]);
+  });
+
+  it('serves the patched engine, not the vendored one', () => {
+    const plugin = plantumlPlugin(context, {stdlib: false});
+    const result = plugin.configureWebpack?.({}, false, utils, undefined) as {
+      plugins: Array<{patterns?: unknown}>;
+    };
+    const copyPlugin = result.plugins[0] as {patterns: Array<{from: string}>};
+    const [viz, engine] = copyPlugin.patterns;
+
+    // Only the engine is rewritten; Graphviz is copied straight out of node_modules.
+    expect(viz?.from).toContain(`${path.sep}node_modules${path.sep}`);
+    expect(engine?.from.startsWith(path.join(siteDir, '.docusaurus'))).toBe(true);
+    expect(fs.readFileSync(engine?.from as string, 'utf8')).toContain(' (max 32768)');
   });
 
   it('emits every vendored standard library bundle beside the runtime', () => {
@@ -67,7 +97,7 @@ describe('runtime asset emission', () => {
     // from a cache populated before it.
     for (const pattern of stdlibPatterns) {
       expect(pattern.to).toMatch(
-        /^assets\/plantuml-client-\d+\.\d+\.\d+\/stdlib-[0-9a-f]{12}\/\[name]\[ext]$/,
+        /^assets\/plantuml-client-\d+\.\d+\.\d+-max32768\/stdlib-[0-9a-f]{12}\/\[name]\[ext]$/,
       );
     }
   });

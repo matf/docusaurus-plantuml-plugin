@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **PlantUML diagrams may now be up to 32768 points tall or wide, instead of 4096.** The
+  bundled `@plantuml/core` refuses to serialize anything larger, reporting
+  `Diagram too large for browser rendering: 78x12916 (max 4096)`. It is not an SVG or browser
+  limit and there is no engine option behind it — `renderToString` takes only `{dark}` — and no
+  way around it from diagram source: the check reads the *pre-scale* dimensions, so `scale`
+  does nothing, and `skinparam dpi` does not move it either. Only shrinking the layout by hand
+  worked, which for a large architecture diagram means drawing a different diagram.
+
+  The plugin now rewrites that ceiling in the engine it serves, raising it to 32768. Diagrams
+  that previously showed an error panel render normally. The rewrite is two literal
+  replacements whose occurrence counts are verified before either is applied, so a future
+  `@plantuml/core` that changes shape fails the build naming the version rather than silently
+  going unpatched — and the unit suite runs the patcher against the installed engine, so a
+  dependency bump catches it here first. See
+  [ADR 0007](docs/adr/0007-engine-size-ceiling-patch.md).
+
+  Two consequences worth knowing. The runtime assets move to
+  `assets/plantuml-client-<coreVersion>-max32768/`, which is required — a reader with a cached
+  copy of the unpatched engine must not be served it from the old URL — and the standard
+  library, which is nested inside that directory, is re-downloaded once. And a genuinely
+  enormous diagram is no longer refused quickly: it renders, but the resulting SVG is parsed
+  synchronously twice on its way in, so it can stall the tab and may need `renderTimeoutMs`
+  raised above its 20 s default.
+
 ## [1.6.3] - 2026-08-31
 
 ### Changed

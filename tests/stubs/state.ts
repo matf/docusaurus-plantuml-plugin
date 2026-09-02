@@ -21,7 +21,7 @@ function defaultGlobalData(options: ResolvedPlantUmlOptions) {
     [PLUGIN_NAME]: {
       default: {
         options,
-        assetsDir: `assets/plantuml-client-${CORE_VERSION}`,
+        assetsDir: `assets/plantuml-client-${CORE_VERSION}-max32768`,
         coreVersion: CORE_VERSION,
       },
     },
