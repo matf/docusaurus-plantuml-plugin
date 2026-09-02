@@ -7,31 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+### Added
 
-- **PlantUML diagrams may now be up to 32768 points tall or wide, instead of 4096.** The
+- **Support for PlantUML diagrams up to 32768 points tall or wide, instead of 4096.** The
   bundled `@plantuml/core` refuses to serialize anything larger, reporting
-  `Diagram too large for browser rendering: 78x12916 (max 4096)`. It is not an SVG or browser
-  limit and there is no engine option behind it — `renderToString` takes only `{dark}` — and no
-  way around it from diagram source: the check reads the *pre-scale* dimensions, so `scale`
-  does nothing, and `skinparam dpi` does not move it either. Only shrinking the layout by hand
-  worked, which for a large architecture diagram means drawing a different diagram.
+  `Diagram too large for browser rendering: 278x5667 (max 4096)` — about forty stacked class
+  boxes, which a real architecture diagram or release runbook passes without trying.
 
-  The plugin now rewrites that ceiling in the engine it serves, raising it to 32768. Diagrams
-  that previously showed an error panel render normally. The rewrite is two literal
+  It is not an SVG or a browser limit, and there is no engine option behind it:
+  `renderToString` takes only `{dark}`. Nor is there a way around it from diagram source. The
+  check reads the *pre-scale* dimensions, so `scale` does nothing; `skinparam dpi` does not
+  move it; `left to right direction` only swaps which of the two numbers is too large. Only
+  shrinking the layout by hand worked, which for a large diagram means drawing a different
+  diagram.
+
+  The plugin now rewrites that ceiling in the engine it serves. Diagrams that previously
+  showed an error panel render normally, in both dimensions. The rewrite is two literal
   replacements whose occurrence counts are verified before either is applied, so a future
   `@plantuml/core` that changes shape fails the build naming the version rather than silently
   going unpatched — and the unit suite runs the patcher against the installed engine, so a
   dependency bump catches it here first. See
   [ADR 0007](docs/adr/0007-engine-size-ceiling-patch.md).
 
-  Two consequences worth knowing. The runtime assets move to
-  `assets/plantuml-client-<coreVersion>-max32768/`, which is required — a reader with a cached
-  copy of the unpatched engine must not be served it from the old URL — and the standard
-  library, which is nested inside that directory, is re-downloaded once. And a genuinely
-  enormous diagram is no longer refused quickly: it renders, but the resulting SVG is parsed
-  synchronously twice on its way in, so it can stall the tab and may need `renderTimeoutMs`
-  raised above its 20 s default.
+### Changed
+
+- **The runtime assets moved to `assets/plantuml-client-<coreVersion>-max32768/`.** What is
+  served is a patched engine, so a reader holding a cached copy of the unpatched one must not
+  be handed it from the old URL. The standard library is nested inside that directory and is
+  therefore re-downloaded once. No configuration changes.
+- **A very large diagram is no longer refused quickly.** It renders instead, but the resulting
+  SVG is parsed synchronously twice on its way in — once to detect engine error pictures, once
+  by the sanitizer — so a diagram of many thousands of points can stall the tab briefly and may
+  need `renderTimeoutMs` raised above its 20 s default. A very wide diagram is scaled down to
+  the content column, which keeps the page layout intact but can leave it too small to read
+  until it is zoomed or maximized.
 
 ## [1.6.3] - 2026-08-31
 
