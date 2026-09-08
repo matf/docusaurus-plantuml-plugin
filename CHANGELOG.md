@@ -47,6 +47,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cache entries outlive the rebuild that lowered it; without this a site that tightened the
   setting would keep serving readers the oversized diagram their tab had already cached.
 
+### Fixed
+
+- **An in-diagram link to a path the running build does not route no longer dead-ends on
+  "Page not found".** Clicks used to go through the Docusaurus router whenever the target was
+  same-origin. On a site published as several Docusaurus builds — one per product area, a docs
+  build beside a marketing build, two builds joined by a reverse proxy — the bundles share an
+  origin but each routes only its own subtree, so a link to a sibling build's page matched no
+  route, rendered *this* build's `NotFound`, and never reached the server that could serve it.
+  The tell was that reloading the same URL worked.
+
+  The plugin now checks the running build's route table and pushes only what this build
+  routes, handing anything else to the browser as a normal navigation. An unknown page inside
+  a subtree this build owns still routes client-side, because its own 404 page is the right
+  answer there. Single-build sites are unaffected. As a side benefit, `experimental_router:
+  'hash'` — where a site-absolute link resolves to a path the router cannot push — now falls
+  back to a native load instead of going nowhere.
+
 ## [1.7.1] - 2026-09-03
 
 ### Changed

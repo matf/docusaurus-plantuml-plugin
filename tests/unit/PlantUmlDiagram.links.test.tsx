@@ -169,6 +169,33 @@ describe('navigating in-diagram links', () => {
     expect(historyPushes).toEqual([]);
   });
 
+  // A site published as several Docusaurus builds shares one origin between bundles that
+  // each route only their own subtree. Pushing a sibling build's path would render *this*
+  // build's "Page not found" and never reach the server that can serve it.
+  it('leaves a same-origin path this build does not route to the browser', async () => {
+    await renderReady({
+      source: '@startuml\ncomponent "Other" as ORDER_SVC [[/systems/wvs/overview]]\n@enduml',
+    });
+
+    const event = click(synthesized()[0] as Element);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(historyPushes).toEqual([]);
+  });
+
+  it('still routes an unknown page inside a subtree this build owns', async () => {
+    // `/plantuml-test/docs` is this build's prefix, so its own NotFound is the right answer
+    // and a server round-trip would be a regression.
+    await renderReady({
+      source: '@startuml\ncomponent "Gone" as ORDER_SVC [[/docs/removed-page]]\n@enduml',
+    });
+
+    const event = click(synthesized()[0] as Element);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(historyPushes).toEqual(['/plantuml-test/docs/removed-page']);
+  });
+
   it('leaves modified clicks to the browser', async () => {
     await renderReady();
     const anchor = synthesized()[0] as Element;

@@ -812,12 +812,22 @@ digraph {
 
 #### How clicks navigate
 
-Both engines share the same navigation behaviour: a click on an in-diagram link to a
-same-site URL goes through the Docusaurus router — no full page load — and site-absolute
-paths get the site's `baseUrl` exactly as markdown links do, so `/docs/orders` means the
-same thing in a diagram as in prose. External links and pure `#…` anchors stay native,
-modified clicks (Ctrl, Cmd, Shift) keep the browser's own behaviour, and a click that ends
-a drag never navigates.
+Both engines share the same navigation behaviour: a click on an in-diagram link to a URL
+**this build routes** goes through the Docusaurus router — no full page load — and
+site-absolute paths get the site's `baseUrl` exactly as markdown links do, so `/docs/orders`
+means the same thing in a diagram as in prose. External links and pure `#…` anchors stay
+native, modified clicks (Ctrl, Cmd, Shift) keep the browser's own behaviour, and a click that
+ends a drag never navigates.
+
+A same-origin path this build has **no route for** stays native too, and that exception
+matters if your site is published as more than one Docusaurus build — one per product area,
+a docs build beside a marketing build, or two builds stitched together by a reverse proxy.
+Those bundles share an origin but each routes only its own subtree, so pushing a sibling
+build's path into this build's router would render _this_ build's "Page not found" while the
+server that could serve it is never asked. (The tell is that reloading the same URL works.)
+The plugin checks the running build's route table and hands anything it does not own to the
+browser. An unknown page _inside_ a subtree this build does own still routes normally — its
+own 404 page is the right answer there.
 
 Clicking either example node above therefore navigates — without a reload — to
 `/docs/orders`, where the diagram containing `ORDER_DETAIL_1` highlights and centres it.

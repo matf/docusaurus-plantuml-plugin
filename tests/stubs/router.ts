@@ -5,7 +5,12 @@ import {useSyncExternalStore} from 'react';
  * build. Mirrors the piece the theme uses: `useLocation`, re-rendering subscribers on every
  * navigation — which is exactly the behaviour the deep-link hook depends on, since router
  * navigations (`history.pushState`) fire no DOM event a component could listen for.
+ *
+ * `matchPath` is re-exported from `react-router-dom` rather than reimplemented: the real
+ * `@docusaurus/router` is itself nothing but that re-export, and the route check's whole
+ * value depends on matching exactly as react-router does — segment boundaries included.
  */
+export {matchPath} from 'react-router-dom';
 
 export interface StubLocation {
   pathname: string;

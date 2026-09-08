@@ -21,9 +21,11 @@ router navigation that drops the hash, which must sweep the highlight.
 component "Command handler" as MESSAGE_MY_GREAT_COMMAND
 component "Archive\n12345" as archive
 component "Jump to target page" as JUMP_CROSS [[/docs/links-target#graph?highlight-node=TARGET_NODE_7]]
+component "Jump to another build" as JUMP_UNROUTED [[/elsewhere/sibling-build-page]]
 note "REACTION-NOTE-1 details" as REACTIONNOTE1
 MESSAGE_MY_GREAT_COMMAND --> archive : stores
 MESSAGE_MY_GREAT_COMMAND --> JUMP_CROSS
+MESSAGE_MY_GREAT_COMMAND --> JUMP_UNROUTED
 archive .. REACTIONNOTE1
 @enduml
 ```
