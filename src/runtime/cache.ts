@@ -20,6 +20,14 @@ export interface CacheKeyInput {
    * invalidates the entries whose pictures it shaped. `null` when it is switched off.
    */
   stdlibRevision: string | null;
+  /**
+   * The size ceiling the entry was rendered under.
+   *
+   * Part of the key because the option can be *lowered*, and `session` mode outlives a
+   * rebuild: without it, a site that tightened `maxSvgSize` would keep serving readers the
+   * oversized diagram their tab had already cached.
+   */
+  maxSvgSize: number;
 }
 
 export interface DiagramCache {
@@ -52,12 +60,16 @@ export function computeCacheKey({
   sanitized,
   coreVersion,
   stdlibRevision,
+  maxSvgSize,
 }: CacheKeyInput): string {
   const mode = dark ? 'dark' : 'light';
   const clean = sanitized ? 'san' : 'raw';
   // The length guards against the (astronomically unlikely) 32-bit hash collision between
   // two different sources that happen to share every other key component.
-  return `${coreVersion}|${stdlibRevision ?? 'nostd'}|${mode}|${clean}|${source.length}|${hash(source)}`;
+  return (
+    `${coreVersion}|${stdlibRevision ?? 'nostd'}|${mode}|${clean}|max${maxSvgSize}|` +
+    `${source.length}|${hash(source)}`
+  );
 }
 
 export interface GraphvizCacheKeyInput {

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`maxSvgSize` — the diagram size ceiling is now a plugin option.** It defaults to `32768`
+  points, exactly the value 1.7.0 applied, so nothing renders differently unless you change
+  it. Raise it for a diagram that still does not fit, or set it to `0` to remove the check:
+
+  ```ts
+  {
+    maxSvgSize: 65_536, // or 0 for no ceiling at all
+  }
+  ```
+
+  It takes a non-negative integer and applies to PlantUML fences only — Graphviz keeps its own
+  `graphviz.maxSourceBytes` guard. A negative value is rejected at build time rather than
+  passed through, because the engine reads a negative as "unspecified" and would quietly fall
+  back to its own 8192 default. See [Diagram size](README.md#diagram-size) and
+  [ADR 0008](docs/adr/0008-configurable-max-svg-size.md).
+
+### Changed
+
+- **The engine is no longer patched.** 1.7.0 rewrote two literals in `@plantuml/core`'s
+  minified bundle to raise a ceiling that had no option behind it. Upstream has since added
+  one ([plantuml/plantuml#2832](https://github.com/plantuml/plantuml/issues/2832)), so the
+  rewrite is gone and the vendored engine ships as published. The build no longer reads and
+  rewrites 7 MB, and `.docusaurus/plantuml-engine/` is no longer generated — an existing one
+  from 1.7.x is orphaned and can be deleted.
+- **`@plantuml/core` now requires `>= 1.2026.8`**, the release that added `maxSvgSize`. An
+  older engine ignores render options it does not know, which would leave `maxSvgSize` reading
+  as honoured while the stock 4096-point ceiling refused large diagrams — so the build fails
+  naming the installed version instead. If an override or a stale lockfile pins you below it,
+  update `@plantuml/core`.
+- **The runtime assets moved back to `assets/plantuml-client-<coreVersion>/`.** The
+  `-max32768` segment existed to distinguish differently patched engines; with no patch it
+  distinguishes nothing. The URL changes anyway because the engine version changes, so this
+  costs no extra cache churn. The standard library is nested inside that directory and is
+  re-downloaded once. No configuration changes.
+- **`maxSvgSize` is part of the render cache key.** The ceiling can be lowered, and `session`
+  cache entries outlive the rebuild that lowered it; without this a site that tightened the
+  setting would keep serving readers the oversized diagram their tab had already cached.
+
 ## [1.7.1] - 2026-09-03
 
 ### Changed

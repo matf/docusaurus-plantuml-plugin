@@ -14,14 +14,14 @@ export interface StubState {
   isBrowser: boolean;
 }
 
-const CORE_VERSION = '1.2026.6';
+const CORE_VERSION = '1.2026.8';
 
 function defaultGlobalData(options: ResolvedPlantUmlOptions) {
   return {
     [PLUGIN_NAME]: {
       default: {
         options,
-        assetsDir: `assets/plantuml-client-${CORE_VERSION}-max32768`,
+        assetsDir: `assets/plantuml-client-${CORE_VERSION}`,
         coreVersion: CORE_VERSION,
       },
     },

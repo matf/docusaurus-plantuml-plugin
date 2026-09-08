@@ -5,7 +5,7 @@ import {renderDiagram} from '../../src/runtime/renderer.js';
 import type {PlantUmlCoreModule} from '../../src/runtime/types.js';
 
 const SOURCE = '@startuml\nAlice -> Bob : Hello\n@enduml';
-const ASSETS = '/plantuml-test/assets/plantuml-client-1.2026.6';
+const ASSETS = '/plantuml-test/assets/plantuml-client-1.2026.8';
 
 function svgFor(label: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><text>${label}</text></svg>`;
@@ -14,14 +14,16 @@ function svgFor(label: string): string {
 /** A stand-in engine whose behaviour each test controls. */
 function fakeEngine(
   behaviour: (lines: string[], dark: boolean) => {svg?: string; error?: unknown},
-): PlantUmlCoreModule & {calls: Array<{lines: string[]; dark: boolean}>} {
-  const calls: Array<{lines: string[]; dark: boolean}> = [];
+): PlantUmlCoreModule & {
+  calls: Array<{lines: string[]; dark: boolean; maxSvgSize: number | undefined}>;
+} {
+  const calls: Array<{lines: string[]; dark: boolean; maxSvgSize: number | undefined}> = [];
   return {
     calls,
     render: () => {},
     renderToString: (lines, onSuccess, onError, options) => {
       const dark = options?.dark === true;
-      calls.push({lines, dark});
+      calls.push({lines, dark, maxSvgSize: options?.maxSvgSize});
       const outcome = behaviour(lines, dark);
       // The real engine always calls back asynchronously.
       setTimeout(() => {
@@ -50,8 +52,9 @@ function request(overrides: Partial<Parameters<typeof renderDiagram>[0]> = {}) {
     dark: false,
     sanitize: true,
     timeoutMs: 5_000,
+    maxSvgSize: 32_768,
     assetsBaseUrl: ASSETS,
-    coreVersion: '1.2026.6',
+    coreVersion: '1.2026.8',
     stdlib: null,
     cache: createDiagramCache('memory', 50),
     ...overrides,
@@ -72,6 +75,29 @@ describe('rendering a diagram', () => {
       request({source: '@startuml\r\nA -> B\r@enduml', importModule: withEngine(engine)}),
     );
     expect(engine.calls[0]?.lines).toEqual(['@startuml', 'A -> B', '@enduml']);
+  });
+
+  // The engine's own default ceiling (8192) is lower than the plugin's, so the option has to
+  // be sent on every render rather than omitted when it looks like a default.
+  it('passes the size ceiling through to the engine', async () => {
+    const engine = fakeEngine(() => ({svg: svgFor('big')}));
+    await renderDiagram(request({maxSvgSize: 65_536, importModule: withEngine(engine)}));
+    expect(engine.calls[0]?.maxSvgSize).toBe(65_536);
+  });
+
+  it('passes a ceiling of 0 through unchanged, so the engine disables the check', async () => {
+    const engine = fakeEngine(() => ({svg: svgFor('unbounded')}));
+    await renderDiagram(request({maxSvgSize: 0, importModule: withEngine(engine)}));
+    expect(engine.calls[0]?.maxSvgSize).toBe(0);
+  });
+
+  it('caches renders made under different ceilings separately', async () => {
+    const cache = createDiagramCache('memory', 50);
+    const engine = fakeEngine((_lines) => ({svg: svgFor('cached')}));
+    await renderDiagram(request({cache, maxSvgSize: 32_768, importModule: withEngine(engine)}));
+    await renderDiagram(request({cache, maxSvgSize: 8_192, importModule: withEngine(engine)}));
+    expect(engine.calls).toHaveLength(2);
+    expect(cache.size()).toBe(2);
   });
 
   it('passes the dark flag through to the engine', async () => {

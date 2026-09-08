@@ -11,6 +11,8 @@ export interface RenderDiagramRequest {
   dark: boolean;
   sanitize: boolean;
   timeoutMs: number;
+  /** Size ceiling in PlantUML points, passed straight to the engine. `0` disables it. */
+  maxSvgSize: number;
   assetsBaseUrl: string;
   coreVersion: string;
   /** Standard library assets for this site, or `null` when the feature is switched off. */
@@ -28,11 +30,16 @@ export interface RenderDiagramRequest {
  * This was verified against the installed `@plantuml/core` rather than assumed: the
  * function's arity is 4 and `{dark: true}` produces different fill colours from `{dark:
  * false}`, which itself is byte-identical to omitting the argument.
+ *
+ * `maxSvgSize` is always passed rather than omitted when it matches a default. The engine's
+ * own default (8192) is lower than this plugin's (32768), so omitting it would quietly
+ * tighten the ceiling.
  */
 function renderWithEngine(
   engine: PlantUmlCoreModule,
   source: string,
   dark: boolean,
+  maxSvgSize: number,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     let settled = false;
@@ -50,7 +57,7 @@ function renderWithEngine(
           settled = true;
           reject(new PlantUmlError('engine', describeEngineError(raw)));
         },
-        {dark},
+        {dark, maxSvgSize},
       );
     } catch (error) {
       if (settled) return;
@@ -67,7 +74,18 @@ function renderWithEngine(
  * {@link enqueueRender} because the engine cannot render two diagrams at once.
  */
 export async function renderDiagram(request: RenderDiagramRequest): Promise<string> {
-  const {source, dark, sanitize, timeoutMs, cache, coreVersion, stdlib, signal, onPhase} = request;
+  const {
+    source,
+    dark,
+    sanitize,
+    timeoutMs,
+    maxSvgSize,
+    cache,
+    coreVersion,
+    stdlib,
+    signal,
+    onPhase,
+  } = request;
 
   const cacheKey = computeCacheKey({
     source,
@@ -75,6 +93,7 @@ export async function renderDiagram(request: RenderDiagramRequest): Promise<stri
     sanitized: sanitize,
     coreVersion,
     stdlibRevision: stdlib?.manifest.revision ?? null,
+    maxSvgSize,
   });
   const cached = cache.get(cacheKey);
   if (cached !== undefined) return cached;
@@ -98,7 +117,7 @@ export async function renderDiagram(request: RenderDiagramRequest): Promise<stri
   onPhase?.('rendering');
   const svg = await enqueueRender(
     async () => {
-      const raw = await renderWithEngine(engine, source, dark);
+      const raw = await renderWithEngine(engine, source, dark, maxSvgSize);
 
       // Invalid PlantUML is reported as a successfully rendered "error picture", not through
       // the error callback, so a rendered SVG still has to be inspected before it is trusted.

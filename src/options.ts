@@ -128,6 +128,20 @@ export interface PlantUmlPluginOptions {
   /** Maximum number of cached SVG entries kept per browsing session. */
   cacheMaxEntries?: number;
   /**
+   * Refuse to render a PlantUML diagram wider or taller than this many points.
+   *
+   * The engine measures the laid-out diagram before serializing it and reports anything
+   * larger through its error callback. Its own default is 8192; this plugin raises it to
+   * 32768, which is high enough that a real architecture diagram or release runbook does not
+   * hit it. `0` removes the check entirely.
+   *
+   * Raising it is not free: the resulting SVG is parsed synchronously twice on its way into
+   * the page, so a diagram of many thousands of points can stall the tab and may need
+   * `renderTimeoutMs` raised with it. Graphviz fences are bounded by
+   * `graphviz.maxSourceBytes` instead — this option does not apply to them.
+   */
+  maxSvgSize?: number;
+  /**
    * Let readers zoom and pan rendered diagrams, with a small control toolbar.
    * Override for a single fence with `zoom` or `zoom=false` in its metastring.
    */
@@ -183,6 +197,7 @@ export const DEFAULT_OPTIONS: ResolvedPlantUmlOptions = {
   showSourceOnError: true,
   renderTimeoutMs: 20_000,
   cacheMaxEntries: 50,
+  maxSvgSize: 32_768,
   zoom: true,
   showSource: true,
   graphviz: DEFAULT_GRAPHVIZ_OPTIONS,
@@ -429,6 +444,26 @@ function validateCacheMaxEntries(value: unknown): number {
 }
 
 /**
+ * Validates `maxSvgSize`, which is a size in PlantUML points and not a byte count.
+ *
+ * `0` is accepted and means "no ceiling" — that is the engine's own convention for the
+ * option, and it is the only value that is not simply a size. Negative numbers are rejected
+ * rather than passed through: the engine treats a negative as "unspecified" and falls back to
+ * its 8192 default, so `-1` would silently mean something quite different from what it reads
+ * like.
+ */
+function validateMaxSvgSize(value: unknown): number {
+  if (value === undefined) return DEFAULT_OPTIONS.maxSvgSize;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    fail(
+      'options.maxSvgSize must be a non-negative integer (0 disables the ceiling), ' +
+        `received ${JSON.stringify(value)}.`,
+    );
+  }
+  return value;
+}
+
+/**
  * Validates raw plugin options and applies defaults.
  *
  * Unknown keys are rejected rather than ignored: a typo in `docusaurus.config.ts` would
@@ -456,6 +491,7 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
     'showSourceOnError',
     'renderTimeoutMs',
     'cacheMaxEntries',
+    'maxSvgSize',
     'zoom',
     'showSource',
     'graphviz',
@@ -516,6 +552,7 @@ export function resolveOptions(rawOptions: unknown): ResolvedPlantUmlOptions {
     ),
     renderTimeoutMs: validateRenderTimeout(rawOptions.renderTimeoutMs),
     cacheMaxEntries: validateCacheMaxEntries(rawOptions.cacheMaxEntries),
+    maxSvgSize: validateMaxSvgSize(rawOptions.maxSvgSize),
     zoom: validateBoolean(rawOptions.zoom, 'zoom', DEFAULT_OPTIONS.zoom),
     showSource: validateBoolean(rawOptions.showSource, 'showSource', DEFAULT_OPTIONS.showSource),
   };

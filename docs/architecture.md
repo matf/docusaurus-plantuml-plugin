@@ -16,6 +16,8 @@ Decisions large enough to deserve their own record live in `docs/adr/`:
 - [ADR 0004 — Render DOT with the Graphviz already inside `@plantuml/core`](adr/0004-graphviz-engine-reuse.md)
 - [ADR 0005 — Serve the standard library as per-namespace bundles](adr/0005-stdlib-bundles.md)
 - [ADR 0007 — Patch the engine's 4096-point diagram ceiling](adr/0007-engine-size-ceiling-patch.md)
+  (superseded by ADR 0008)
+- [ADR 0008 — Configure the diagram size ceiling through `maxSvgSize`](adr/0008-configurable-max-svg-size.md)
 
 ## Overview
 
@@ -109,45 +111,31 @@ shipped at PlantUML's discretion. Checking here turns a dependency bump that dro
 failed CI run rather than a runtime load failure in a reader's browser. See
 [ADR 0004](adr/0004-graphviz-engine-reuse.md).
 
-### Raising the engine's size ceiling
-
-The `plantuml.js` that reaches the browser is **not** the vendored file. `@plantuml/core`
-refuses to serialize any diagram wider or taller than 4096 points — a ceiling with no engine
-option behind it, and one that `scale` and `skinparam dpi` provably do not move — so
-`resolvePatchedEngine()` rewrites two literals in it, raising that to 32768:
-
-```text
->4096.0)      →  >32768.0)      (the width and height comparisons, exactly 2 occurrences)
- (max 4096)   →   (max 32768)   (the engine's own error message, exactly 1 occurrence)
-```
-
-Both counts are checked before either replacement is applied, and any other count fails the
-build naming the installed `@plantuml/core` version. The anchors deliberately avoid the
-surrounding minified identifiers, which TeaVM renames on every release.
-
-The patched file is generated into `<generatedFilesDir>/plantuml-engine/<coreVersion>/`, inside
-`configureWebpack`'s client branch so that `swizzle`, `write-translations` and the server
-compilation never pay for it. It is written to a `.tmp` sibling and renamed into place, because
-`.docusaurus` is shared across locales built in separate processes. An existing build is reused
-when its size is exactly three bytes larger than the vendored file — every replacement is
-fixed-width ASCII, so that is an exact fingerprint for one `stat`. See
-[ADR 0007](adr/0007-engine-size-ceiling-patch.md).
+It also **asserts the version floor**. `@plantuml/core@1.2026.8` added the `maxSvgSize` render
+option that `options.maxSvgSize` is implemented on, and an engine that does not know a render
+option ignores it in silence — so on an older install the setting would read as honoured while
+the engine's own 4096-point ceiling quietly refused large diagrams. `package.json` already asks
+for a new enough version, but an override, a hoisted duplicate or a stale lockfile can defeat
+that, so the check is made against what is actually on disk. See
+[ADR 0008](adr/0008-configurable-max-svg-size.md).
 
 ### Emitting them
 
-`configureWebpack` then registers a copy plugin that emits `viz-global.js` and the patched
+`configureWebpack` registers a copy plugin that emits the vendored `viz-global.js` and
 `plantuml.js` into
 
 ```text
-<baseUrl>assets/plantuml-client-<coreVersion>-max32768/
+<baseUrl>assets/plantuml-client-<coreVersion>/
 ```
 
 The engine version is in the directory name, so upgrading `@plantuml/core` changes every asset
-URL and no stale cache entry can survive. The `-max32768` segment is there for the same reason
-one level down: what is served is a patched engine, and a reader holding a cached copy from a
-plugin version that patched differently — or not at all — must not be handed it from the same
-URL. Both files are marked `info: {minimized: true}`: they are already minified upstream, and
-re-processing 8 MB is wasted build time.
+URL and no stale cache entry can survive. Both files are marked `info: {minimized: true}`: they
+are already minified upstream, and re-processing 8 MB is wasted build time.
+
+Until 1.8.0 this directory carried a `-max32768` segment and the emitted `plantuml.js` was a
+build-time rewrite of the vendored one, because the engine's size ceiling was a hard-coded
+literal with no option behind it. `maxSvgSize` replaced all of that; what ships now is the file
+as published.
 
 Both bundlers are supported. Rspack (`future.v4`, `@docusaurus/faster`) does not accept
 `copy-webpack-plugin` and ships `CopyRspackPlugin` instead, so `createCopyPlugin()` branches
@@ -166,7 +154,7 @@ namespaces this site emits: the vendored bundles in `assets/stdlib`, narrowed by
 into
 
 ```text
-<baseUrl>assets/plantuml-client-<coreVersion>-max32768/stdlib-<revision>/
+<baseUrl>assets/plantuml-client-<coreVersion>/stdlib-<revision>/
 ```
 
 The extra `stdlib-<revision>` segment exists because the standard library changes on its own
@@ -341,13 +329,18 @@ repeated phase report cannot cause a pointless re-render.
 `runtime/cache.ts`. The key folds in everything that can change the output:
 
 ```text
-<coreVersion>|<light|dark>|<san|raw>|<sourceLength>|<FNV-1a hash of source>
+<coreVersion>|<stdlibRevision|nostd>|<light|dark>|<san|raw>|max<maxSvgSize>|<sourceLength>|<FNV-1a hash of source>
 ```
 
 - **`coreVersion`** — an engine upgrade invalidates every stored entry.
+- **standard library revision** — refreshing it invalidates the entries whose pictures its
+  includes shaped; `nostd` when it is switched off.
 - **colour mode** — toggling dark mode can never serve the other mode's picture.
 - **sanitized flag** — flipping `sanitizeSvg` cannot serve output produced under the other
   policy.
+- **`maxSvgSize`** — the ceiling can be _lowered_, and `session` entries outlive the rebuild
+  that lowered it, so without this a site that tightened the setting would keep serving readers
+  an oversized diagram their tab had already cached.
 - **source length alongside the hash** — FNV-1a is a fast, stable, non-cryptographic 32-bit
   hash; including the length means a collision alone cannot serve the wrong diagram.
 

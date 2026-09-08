@@ -14,29 +14,23 @@ export const DEFAULT_PLUGIN_ID = 'default';
 export const PLUGIN_NAME = `docusaurus-plugin-${PLUGIN_ID}`;
 
 /**
- * The diagram size ceiling hard-coded in `@plantuml/core`'s own build, in PlantUML points.
+ * The lowest `@plantuml/core` this plugin supports, checked by `locatePlantUmlCore()`.
  *
- * The engine compares the laid-out diagram's width and height against it and refuses anything
- * larger with `Diagram too large for browser rendering: WxH (max 4096)`.
+ * 1.2026.8 is the release that added the `maxSvgSize` render option. On anything older the
+ * option is silently ignored and the engine's own 4096-point ceiling applies, which would
+ * turn `options.maxSvgSize` into a setting that reads as honoured and is not.
  */
-export const UPSTREAM_MAX_DIAGRAM_SIZE = 4096;
-
-/**
- * The ceiling this plugin patches into the engine it serves. See `src/enginePatch.ts` and
- * `docs/adr/0007-engine-size-ceiling-patch.md`.
- */
-export const MAX_DIAGRAM_SIZE = 32_768;
+export const MINIMUM_CORE_VERSION = '1.2026.8';
 
 /**
  * Directory (relative to `baseUrl`) that the PlantUML runtime assets are emitted into.
  *
- * The `-max…` segment is part of the engine's identity, not decoration: the file served here
- * is a *patched* `plantuml.js`, so a reader holding a cached copy from a plugin version that
- * patched to a different ceiling — or did not patch at all — must not be handed it from the
- * same URL. Same reasoning as the `stdlib-<revision>` segment nested inside this one.
+ * The engine version is in the name so that upgrading `@plantuml/core` moves every asset URL
+ * and no stale cache entry can survive it. Same reasoning as the `stdlib-<revision>` segment
+ * nested inside this one.
  */
 export function assetsDirForVersion(coreVersion: string): string {
-  return `assets/${PLUGIN_ID}-${coreVersion}-max${MAX_DIAGRAM_SIZE}`;
+  return `assets/${PLUGIN_ID}-${coreVersion}`;
 }
 
 export const VIZ_SCRIPT_FILENAME = 'viz-global.js';

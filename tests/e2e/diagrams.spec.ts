@@ -173,7 +173,7 @@ test.describe('client-side PlantUML rendering', () => {
         true,
       );
       // Version-namespaced so an engine upgrade cannot be served from a stale cache.
-      expect(url).toMatch(/\/assets\/plantuml-client-\d+\.\d+\.\d+-max32768\//);
+      expect(url).toMatch(/\/assets\/plantuml-client-\d+\.\d+\.\d+\//);
     }
   });
 

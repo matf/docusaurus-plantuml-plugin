@@ -13,8 +13,9 @@ const BASE = {
   source: SOURCE,
   dark: false,
   sanitized: true,
-  coreVersion: '1.2026.6',
+  coreVersion: '1.2026.8',
   stdlibRevision: 'abc123' as string | null,
+  maxSvgSize: 32_768,
 };
 
 describe('cache keys', () => {
@@ -50,8 +51,17 @@ describe('cache keys', () => {
     expect(computeCacheKey({...BASE, stdlibRevision: null})).not.toBe(computeCacheKey(BASE));
   });
 
-  it('encodes the colour mode and engine version legibly', () => {
-    expect(computeCacheKey({...BASE, dark: true})).toMatch(/^1\.2026\.6\|abc123\|dark\|san\|/);
+  // `maxSvgSize` can be lowered, and `session` entries outlive the rebuild that lowered it,
+  // so a stale entry would otherwise keep serving a diagram the new ceiling refuses.
+  it('changes when the size ceiling changes', () => {
+    expect(computeCacheKey({...BASE, maxSvgSize: 8192})).not.toBe(computeCacheKey(BASE));
+    expect(computeCacheKey({...BASE, maxSvgSize: 0})).not.toBe(computeCacheKey(BASE));
+  });
+
+  it('encodes the colour mode, engine version and ceiling legibly', () => {
+    expect(computeCacheKey({...BASE, dark: true})).toMatch(
+      /^1\.2026\.8\|abc123\|dark\|san\|max32768\|/,
+    );
   });
 });
 
@@ -260,6 +270,7 @@ describe('graphviz cache keys', () => {
       sanitized: true,
       coreVersion: base.coreVersion,
       stdlibRevision: null,
+      maxSvgSize: 32_768,
     });
     expect(computeGraphvizCacheKey(base)).not.toBe(plantuml);
     expect(computeGraphvizCacheKey(base).startsWith('graphviz|')).toBe(true);

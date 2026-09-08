@@ -1,9 +1,9 @@
 /**
  * The public surface of `@plantuml/core@1.2026.x`, verified against the installed package.
  *
- * `plantuml.js` exports exactly two functions. Both take an optional trailing options
- * object whose only recognized member is `dark`; see `docs/architecture.md` for how this
- * was established and `tests/e2e/engine-contract.spec.ts` for the regression guard.
+ * `plantuml.js` exports exactly two functions. Both take an optional trailing options object
+ * whose recognized members are `dark` and `maxSvgSize`; see `docs/architecture.md` for how
+ * this was established and `tests/e2e/engine-contract.spec.ts` for the regression guard.
  */
 export interface PlantUmlCoreModule {
   render(lines: string[], targetId: string, options?: PlantUmlRenderOptions): void;
@@ -17,6 +17,15 @@ export interface PlantUmlCoreModule {
 
 export interface PlantUmlRenderOptions {
   dark?: boolean;
+  /**
+   * Ceiling, in PlantUML points, on the laid-out diagram's width and height.
+   *
+   * Added in `@plantuml/core@1.2026.8`; `src/assets.ts` refuses to build against anything
+   * older, because an engine that does not know the option ignores it silently. `0` disables
+   * the check; a *negative* value is treated by the engine as unspecified and falls back to
+   * its own 8192 default, which is why `options.maxSvgSize` rejects negatives outright.
+   */
+  maxSvgSize?: number;
 }
 
 export type DiagramStatus = 'idle' | 'loading' | 'rendering' | 'ready' | 'error';

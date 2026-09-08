@@ -60,7 +60,7 @@ them are exported.
 | Node.js (build) | `>= 20.9.0` (the Node 20 LTS line)                                                     |
 | React           | `18.x` or `19.x` (matching your Docusaurus install)                                    |
 | Bundler         | webpack (default) and Rspack (`future.v4` / `@docusaurus/faster`)                      |
-| PlantUML engine | `@plantuml/core` `1.2026.6`                                                            |
+| PlantUML engine | `@plantuml/core` `>= 1.2026.8`                                                         |
 | Browsers        | Modern evergreen browsers; no IE (see [Browser compatibility](#browser-compatibility)) |
 
 The plugin requires a theme that already provides `MDXComponents/Code` — in practice
@@ -100,8 +100,10 @@ exactly what the compatibility job in CI does to test the `3.5.2` leg.
 ### A note on the engine's licence
 
 `@plantuml/core` is MIT-licensed **from version `1.2026.6` onwards**. Earlier versions were
-published under GPL-3.0-or-later. This plugin depends on `^1.2026.6` for that reason; if you
-pin or dedupe `@plantuml/core` to an older version yourself, you inherit the older licence.
+published under GPL-3.0-or-later. This plugin depends on `^1.2026.8` — which is well past that
+line, and is also the release that added the `maxSvgSize` option
+[`maxSvgSize`](#diagram-size) relies on. Pinning or deduping `@plantuml/core` below `1.2026.8`
+fails the build with a message naming the version, rather than silently ignoring the option.
 
 ## Installation
 
@@ -149,6 +151,7 @@ const config: Config = {
         showSourceOnError: true,
         renderTimeoutMs: 20_000,
         cacheMaxEntries: 50,
+        maxSvgSize: 32_768,
         zoom: true,
         graphviz: {
           enabled: true,
@@ -231,26 +234,29 @@ props untouched. Existing code-block behaviour (highlighting, line numbers, titl
 
 ## Options
 
-| Option              | Type                              | Default                | Description                                                                                                                         |
-| ------------------- | --------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `languages`         | `string[]`                        | `['plantuml', 'puml']` | Fence languages treated as PlantUML. Matched case-insensitively; must contain at least one non-empty, non-duplicate entry.          |
-| `theme`             | `'auto' \| 'light' \| 'dark'`     | `'auto'`               | Diagram colour scheme. `auto` follows the Docusaurus colour mode; `light`/`dark` pin it.                                            |
-| `lazy`              | `boolean`                         | `true`                 | Render a diagram only once it scrolls near the viewport (300 px root margin).                                                       |
-| `cache`             | `'none' \| 'memory' \| 'session'` | `'memory'`             | Where rendered SVG is cached.                                                                                                       |
-| `sanitizeSvg`       | `boolean`                         | `true`                 | Run rendered SVG through DOMPurify before inserting it. See [Security model](#svg-sanitization-and-security-model).                 |
-| `showSourceOnError` | `boolean`                         | `true`                 | Include the diagram source in a `<details>` block on the error panel.                                                               |
-| `renderTimeoutMs`   | `number`                          | `20000`                | Abort a single render (and the runtime load) after this many milliseconds. Integer, `100`–`600000`.                                 |
-| `cacheMaxEntries`   | `number`                          | `50`                   | Upper bound on cached SVG entries. Positive integer.                                                                                |
-| `zoom`              | `boolean`                         | `true`                 | Let readers zoom and pan diagrams. Adds a control toolbar and a focusable viewport. Override per fence with `zoom=false`.           |
-| `showSource`        | `boolean`                         | `true`                 | Offer a toolbar control that reveals the diagram source and copies it to the clipboard. Override per fence with `showSource=false`. |
-| `graphviz`          | `object`                          | see below              | Graphviz/DOT support. See [Graphviz options](#graphviz-options).                                                                    |
-| `stdlib`            | `object \| false`                 | see below              | PlantUML standard library (`!include <C4/…>`). See [Standard library options](#standard-library-options).                           |
-| `id`                | `string`                          | `'default'`            | Docusaurus plugin instance id; only relevant if you register the plugin more than once.                                             |
+| Option              | Type                              | Default                | Description                                                                                                                                       |
+| ------------------- | --------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `languages`         | `string[]`                        | `['plantuml', 'puml']` | Fence languages treated as PlantUML. Matched case-insensitively; must contain at least one non-empty, non-duplicate entry.                        |
+| `theme`             | `'auto' \| 'light' \| 'dark'`     | `'auto'`               | Diagram colour scheme. `auto` follows the Docusaurus colour mode; `light`/`dark` pin it.                                                          |
+| `lazy`              | `boolean`                         | `true`                 | Render a diagram only once it scrolls near the viewport (300 px root margin).                                                                     |
+| `cache`             | `'none' \| 'memory' \| 'session'` | `'memory'`             | Where rendered SVG is cached.                                                                                                                     |
+| `sanitizeSvg`       | `boolean`                         | `true`                 | Run rendered SVG through DOMPurify before inserting it. See [Security model](#svg-sanitization-and-security-model).                               |
+| `showSourceOnError` | `boolean`                         | `true`                 | Include the diagram source in a `<details>` block on the error panel.                                                                             |
+| `renderTimeoutMs`   | `number`                          | `20000`                | Abort a single render (and the runtime load) after this many milliseconds. Integer, `100`–`600000`.                                               |
+| `cacheMaxEntries`   | `number`                          | `50`                   | Upper bound on cached SVG entries. Positive integer.                                                                                              |
+| `maxSvgSize`        | `number`                          | `32768`                | Refuse a PlantUML diagram wider or taller than this many points. Non-negative integer; `0` disables the check. See [Diagram size](#diagram-size). |
+| `zoom`              | `boolean`                         | `true`                 | Let readers zoom and pan diagrams. Adds a control toolbar and a focusable viewport. Override per fence with `zoom=false`.                         |
+| `showSource`        | `boolean`                         | `true`                 | Offer a toolbar control that reveals the diagram source and copies it to the clipboard. Override per fence with `showSource=false`.               |
+| `graphviz`          | `object`                          | see below              | Graphviz/DOT support. See [Graphviz options](#graphviz-options).                                                                                  |
+| `stdlib`            | `object \| false`                 | see below              | PlantUML standard library (`!include <C4/…>`). See [Standard library options](#standard-library-options).                                         |
+| `id`                | `string`                          | `'default'`            | Docusaurus plugin instance id; only relevant if you register the plugin more than once.                                                           |
 
-Every option above except `graphviz` and `stdlib` applies to **both** engines: `lazy`, `cache`,
-`sanitizeSvg`, `showSourceOnError`, `renderTimeoutMs`, `cacheMaxEntries` and `zoom` behave
-identically for a `dot` fence and a `plantuml` fence. `theme` is the exception — see
-[Light and dark mode](#light-and-dark-mode).
+Every option above except `graphviz`, `stdlib`, `theme` and `maxSvgSize` applies to **both**
+engines: `lazy`, `cache`, `sanitizeSvg`, `showSourceOnError`, `renderTimeoutMs`,
+`cacheMaxEntries` and `zoom` behave identically for a `dot` fence and a `plantuml` fence.
+`theme` is the exception for colour — see [Light and dark mode](#light-and-dark-mode) — and
+`maxSvgSize` is PlantUML-only, because Graphviz fences are bounded by
+`graphviz.maxSourceBytes` instead.
 
 Options are validated during the Docusaurus configuration phase, before anything is built.
 **Unknown keys are rejected** rather than ignored, because a typo in `docusaurus.config.ts`
@@ -259,7 +265,8 @@ would otherwise silently disable the option you meant to set:
 ```text
 [docusaurus-plugin-plantuml-client] Unknown option 'sanitiseSvg'. Supported options:
 'languages', 'theme', 'lazy', 'cache', 'sanitizeSvg', 'showSourceOnError',
-'renderTimeoutMs', 'cacheMaxEntries', 'zoom', 'showSource', 'graphviz', 'stdlib'.
+'renderTimeoutMs', 'cacheMaxEntries', 'maxSvgSize', 'zoom', 'showSource', 'graphviz',
+'stdlib'.
 ```
 
 The same is true one level deeper, so `graphviz: {enigne: 'neato'}` fails the build rather than
@@ -1043,7 +1050,7 @@ Failures are classified internally as one of:
 | Kind        | Cause                                                                                                                                                                                  |
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `load`      | `viz-global.js` or `plantuml.js` could not be fetched, timed out, or was not the expected module (usually a proxy or service worker returning the wrong file).                         |
-| `engine`    | The engine threw, or its output could not be used at all. Includes `Diagram too large for browser rendering: WxH (max 32768)` — see [Diagram size](#diagram-size).                     |
+| `engine`    | The engine threw, or its output could not be used at all. Includes `Diagram too large for browser rendering: WxH (max 32768; …)` — see [Diagram size](#diagram-size).                  |
 | `diagram`   | The source is not valid PlantUML.                                                                                                                                                      |
 | `syntax`    | The source is not valid DOT. Carries Graphviz's own diagnostic, including the line number.                                                                                             |
 | `too-large` | A DOT source exceeded `graphviz.maxSourceBytes`.                                                                                                                                       |
@@ -1067,19 +1074,35 @@ The two engines report invalid source very differently:
 
 ## Diagram size
 
-`@plantuml/core` refuses to serialize a diagram wider or taller than a fixed number of
-PlantUML points, reporting it through its error callback:
+`@plantuml/core` measures every diagram it lays out and refuses to serialize one wider or
+taller than a set number of PlantUML points, reporting it through its error callback:
 
 ```text
-Diagram too large for browser rendering: 78x12916 (max 4096)
+Diagram too large for browser rendering: 78x12916 (max 8192; override via the maxSvgSize
+option, or set it to 0 to disable this check)
 ```
 
-Upstream that limit is **4096**. This plugin patches the engine it serves and raises it to
-**32768**, so diagrams that the stock engine rejects render normally here. It is not
-configurable — one constant, applied on every build.
+The engine's own ceiling is **8192**. This plugin sets **32768** by default — high enough that
+a real architecture diagram or release runbook does not meet it — and `maxSvgSize` moves it:
 
-The limit is not something a diagram can talk its way around, which is why patching it was
-worth doing. Measured against the engine:
+```ts
+{
+  maxSvgSize: 65_536, // raise it
+}
+```
+
+```ts
+{
+  maxSvgSize: 0, // no ceiling at all
+}
+```
+
+It takes a non-negative integer. `0` is the engine's own convention for "no check"; a negative
+value is rejected at build time rather than passed through, because the engine reads a negative
+as "unspecified" and would quietly fall back to 8192.
+
+The ceiling is not something a diagram can talk its way around, which is why the option is the
+only real lever. Measured against the engine:
 
 | Attempt                   | Effect                                                   |
 | ------------------------- | -------------------------------------------------------- |
@@ -1088,38 +1111,38 @@ worth doing. Measured against the engine:
 | `left to right direction` | none; it transposes width and height                     |
 | `skinparam ranksep 5`     | works — it genuinely shrinks the layout                  |
 
-If you still hit the ceiling at 32768, the levers that work are the ones that make the
-diagram smaller: fewer nodes and edges, tighter `skinparam ranksep`/`nodesep`, a smaller
-`skinparam defaultFontSize`, or splitting one diagram into several fences.
+So if you would rather keep the ceiling where it is, the levers that work are the ones that
+make the diagram smaller: fewer nodes and edges, tighter `skinparam ranksep`/`nodesep`, a
+smaller `skinparam defaultFontSize`, or splitting one diagram into several fences.
 
-**A very large diagram is not free.** A 30 000-point diagram is a multi-hundred-KB SVG, and
-both the error detection and the DOMPurify sanitization parse it synchronously on the main
-thread. Such a diagram can visibly stall the tab while it lands, and may need
-`renderTimeoutMs` raised above its 20 s default. See
-[ADR 0007](docs/adr/0007-engine-size-ceiling-patch.md).
+**Raising it is not free.** A 30 000-point diagram is a multi-hundred-KB SVG, and both the
+error detection and the DOMPurify sanitization parse it synchronously on the main thread. Such
+a diagram can visibly stall the tab while it lands, and may need `renderTimeoutMs` raised above
+its 20 s default. That cost is the reason the default is a number rather than `0`. See
+[ADR 0008](docs/adr/0008-configurable-max-svg-size.md).
+
+`maxSvgSize` applies to PlantUML fences only; Graphviz has its own guard in
+`graphviz.maxSourceBytes`.
 
 ## `baseUrl` support
 
 The runtime assets are emitted into
 
 ```text
-<baseUrl>assets/plantuml-client-<coreVersion>-max32768/
+<baseUrl>assets/plantuml-client-<coreVersion>/
 ```
 
 and resolved in the browser through Docusaurus' own `useBaseUrl()`. A site deployed at
 `baseUrl: '/plantuml-test/'` therefore fetches:
 
 ```text
-/plantuml-test/assets/plantuml-client-1.2026.6-max32768/viz-global.js
-/plantuml-test/assets/plantuml-client-1.2026.6-max32768/plantuml.js
+/plantuml-test/assets/plantuml-client-1.2026.8/viz-global.js
+/plantuml-test/assets/plantuml-client-1.2026.8/plantuml.js
 ```
 
 No path is hard-coded to the site root, so project-pages deployments and reverse-proxied
 subpaths work without configuration. The engine version is part of the directory name, so an
-upgrade changes the URL and stale caches are defeated automatically. The `-max32768` segment
-is part of the same identity: what is served is a _patched_ engine (see
-[Diagram size](#diagram-size)), and a reader holding a cached copy from a plugin version that
-patched differently must not be handed it from the same URL. The bundled example site
+upgrade changes the URL and stale caches are defeated automatically. The bundled example site
 deploys under a non-root `baseUrl` precisely so this path is exercised on every build.
 
 ## Browser compatibility
@@ -1466,16 +1489,16 @@ too and was rejected: it carries one person's account reach and expires on a cal
 - **One PlantUML diagram renders at a time.** The PlantUML engine has module-level shared
   state, so a page with many large diagrams renders them sequentially. This is a correctness
   requirement, not a tuning knob. Graphviz has no such constraint and is not queued.
-- **PlantUML diagrams are capped at 32768 points in each dimension.** The bundled engine has
-  a hard ceiling with no option behind it; the plugin patches it up from the stock 4096, but
-  it cannot be removed or configured. Past that, the diagram itself has to get smaller — see
-  [Diagram size](#diagram-size). The raised ceiling also means a genuinely enormous diagram
-  now renders instead of failing fast, and both the error detection and the sanitizer parse
-  the resulting SVG synchronously, so it can stall the tab on its way in.
-- **A `@plantuml/core` release that changes the shape of that ceiling fails the build.** The
-  patch is anchored on two literals whose occurrence counts are verified before anything is
-  rewritten, and the plugin refuses to guess. The unit suite runs the patcher against the
-  installed engine, so a dependency bump that broke it goes red here rather than in your build.
+- **PlantUML diagrams are capped at 32768 points in each dimension by default.** The engine
+  measures the laid-out diagram and refuses anything larger. `maxSvgSize` raises the ceiling,
+  or removes it with `0` — see [Diagram size](#diagram-size) — but a genuinely enormous diagram
+  then renders instead of failing fast, and both the error detection and the sanitizer parse
+  the resulting SVG synchronously, so it can stall the tab on its way in. Past that, the
+  diagram itself has to get smaller.
+- **A `@plantuml/core` older than `1.2026.8` fails the build.** That release added the
+  `maxSvgSize` render option, and an engine that does not know the option ignores it in
+  silence — which would leave `maxSvgSize` reading as honoured while the engine's own ceiling
+  refused large diagrams. The plugin checks the installed version rather than guessing.
 - **Graphviz rendering blocks the main thread.** Viz.js lays out synchronously. A 300-edge
   graph takes ~26 ms, but a 3 000-edge graph takes ~2.25 s and visibly freezes the page;
   `graphviz.maxSourceBytes` is the guard. Rendering in a Web Worker would remove the ceiling
@@ -1498,7 +1521,7 @@ too and was rejected: it carries one person's account reach and expires on a cal
 ### Diagrams stay on "Loading PlantUML runtime…" and the assets 404 under a subpath
 
 Open the network tab and check the failing URL. It should be
-`<baseUrl>assets/plantuml-client-<version>-max32768/viz-global.js`. If the request goes to
+`<baseUrl>assets/plantuml-client-<version>/viz-global.js`. If the request goes to
 `/assets/...` when your site lives at `/docs/`, the site's `baseUrl` is wrong — not the
 plugin's paths, which are always resolved through `useBaseUrl()`.
 
@@ -1522,7 +1545,7 @@ served as `text/plain`, `application/octet-stream` or `text/html`. The console s
 MIME type checking error. Check with:
 
 ```bash
-curl -I https://example.com/your-base-url/assets/plantuml-client-1.2026.6-max32768/plantuml.js
+curl -I https://example.com/your-base-url/assets/plantuml-client-1.2026.8/plantuml.js
 ```
 
 The `content-type` must be a JavaScript type (`text/javascript` or

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {locatePlantUmlCore} from '../../src/assets.js';
+import {MINIMUM_CORE_VERSION} from '../../src/constants.js';
 
 /**
  * The build-time half of the §8.1 mitigation.
@@ -66,5 +67,47 @@ describe('locating the runtime assets', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
 
     expect(() => locatePlantUmlCore()).toThrow(/@plantuml\/core@\d+\.\d+\.\d+/);
+  });
+});
+
+/**
+ * The engine ignores render options it does not know, so an install that predates
+ * `maxSvgSize` would honour `options.maxSvgSize` in appearance only while the engine's own
+ * 4096-point ceiling refused large diagrams. `package.json` asks for a new enough version,
+ * but an override, a hoisted duplicate or a stale lockfile can still defeat that.
+ */
+describe('the minimum supported @plantuml/core version', () => {
+  /** Reads the version through the same path `locatePlantUmlCore` does, then rewrites it. */
+  function withInstalledVersion(version: string): void {
+    const realReadFileSync = fs.readFileSync.bind(fs);
+    vi.spyOn(fs, 'readFileSync').mockImplementation(((file: never, ...rest: never[]) => {
+      const contents = realReadFileSync(file, ...(rest as [])) as string | Buffer;
+      if (!String(file).includes('@plantuml/core')) return contents;
+      return JSON.stringify({...JSON.parse(String(contents)), version});
+    }) as typeof fs.readFileSync);
+  }
+
+  it('accepts the version installed in this repository', () => {
+    expect(() => locatePlantUmlCore()).not.toThrow();
+    expect(locatePlantUmlCore().version).toBe(MINIMUM_CORE_VERSION);
+  });
+
+  it('accepts a newer engine', () => {
+    withInstalledVersion('1.2027.0');
+    expect(() => locatePlantUmlCore()).not.toThrow();
+  });
+
+  it('fails the build on an engine without the maxSvgSize option', () => {
+    withInstalledVersion('1.2026.7');
+
+    expect(() => locatePlantUmlCore()).toThrow(/is older than the minimum this plugin supports/);
+    expect(() => locatePlantUmlCore()).toThrow(/maxSvgSize/);
+    expect(() => locatePlantUmlCore()).toThrow(/@plantuml\/core@1\.2026\.7/);
+  });
+
+  it('compares numerically rather than lexically', () => {
+    // '1.2026.10' sorts before '1.2026.8' as a string; it must not be rejected.
+    withInstalledVersion('1.2026.10');
+    expect(() => locatePlantUmlCore()).not.toThrow();
   });
 });

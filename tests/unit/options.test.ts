@@ -19,6 +19,7 @@ describe('plugin option defaults', () => {
       showSourceOnError: true,
       renderTimeoutMs: 20_000,
       cacheMaxEntries: 50,
+      maxSvgSize: 32_768,
       zoom: true,
       showSource: true,
       graphviz: {
@@ -58,6 +59,12 @@ describe('plugin option defaults', () => {
     expect(resolved.sanitizeSvg).toBe(true);
   });
 
+  it('keeps an explicit size ceiling, including 0', () => {
+    expect(resolveOptions({maxSvgSize: 65_536}).maxSvgSize).toBe(65_536);
+    // 0 is the engine's own convention for "no ceiling", not a rejected edge case.
+    expect(resolveOptions({maxSvgSize: 0}).maxSvgSize).toBe(0);
+  });
+
   it('keeps an explicit zoom value', () => {
     expect(resolveOptions({zoom: false}).zoom).toBe(false);
     expect(resolveOptions({zoom: true}).zoom).toBe(true);
@@ -90,6 +97,9 @@ describe('plugin option validation', () => {
     ['a timeout below the minimum', {renderTimeoutMs: 10}, /must be between 100 and 600000/],
     ['a timeout above the maximum', {renderTimeoutMs: 900_000}, /must be between 100 and 600000/],
     ['a zero cache limit', {cacheMaxEntries: 0}, /must be a positive integer/],
+    ['a negative size ceiling', {maxSvgSize: -1}, /must be a non-negative integer/],
+    ['a fractional size ceiling', {maxSvgSize: 4096.5}, /must be a non-negative integer/],
+    ['a non-numeric size ceiling', {maxSvgSize: '32768'}, /must be a non-negative integer/],
     ['a non-boolean zoom', {zoom: 'yes'}, /options\.zoom must be a boolean/],
   ];
 
@@ -141,7 +151,7 @@ describe('plugin factory', () => {
 
     expect(published).toMatchObject({
       options: expect.objectContaining({theme: 'dark', languages: ['plantuml', 'puml']}),
-      assetsDir: expect.stringMatching(/^assets\/plantuml-client-\d+\.\d+\.\d+-max32768$/),
+      assetsDir: expect.stringMatching(/^assets\/plantuml-client-\d+\.\d+\.\d+$/),
       coreVersion: expect.stringMatching(/^\d+\.\d+\.\d+$/),
     });
   });
