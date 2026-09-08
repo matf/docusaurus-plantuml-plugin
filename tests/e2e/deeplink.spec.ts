@@ -124,6 +124,34 @@ test.describe('diagram links and deep links', () => {
     ).toBe(true);
   });
 
+  // A site published as several Docusaurus builds shares one origin between bundles that
+  // route only their own subtree. `/elsewhere/…` matches no route of this build, so the click
+  // must reach the server rather than render this build's own "Page not found".
+  test('a link this build does not route leaves the SPA instead of 404ing inside it', async ({
+    page,
+  }) => {
+    await page.goto('docs/links');
+    await waitForDiagrams(page, 3);
+    // Survives a router push, dies on a document navigation — here the absence is the proof.
+    await page.evaluate(() => {
+      (window as unknown as {__sameDocument?: boolean}).__sameDocument = true;
+    });
+
+    const figures = page.locator('[data-plantuml-diagram]');
+    const link = figures.nth(0).locator('svg a[data-plantuml-diagram-link][href*="elsewhere"]');
+    await expect(link).toHaveCount(1);
+    await Promise.all([page.waitForEvent('framenavigated'), link.click()]);
+
+    // The document was replaced, which is the whole claim: a router push would have kept the
+    // marker alive. Where the browser lands is the *server's* business — this fixture is one
+    // build, so `docusaurus serve` answers an unrouted path however it likes; a multi-build
+    // deployment is exactly the case where it has a real page to serve.
+    expect(
+      await page.evaluate(() => (window as unknown as {__sameDocument?: boolean}).__sameDocument),
+    ).toBeUndefined();
+    expect(page.url()).not.toContain('docs/links');
+  });
+
   test('a node from a stdlib-include diagram links across pages too', async ({page}) => {
     // `!include <C4/C4_Container>` shifts the engine's line numbers, so this passes only
     // through the alias-based correlation.

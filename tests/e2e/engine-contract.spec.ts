@@ -19,6 +19,10 @@ interface EngineProbe {
   explicitLightMatchesDefault: boolean;
   invalidResolvesSuccessfully: boolean;
   invalidText: string;
+  defaultCeilingRefusesOversize: boolean;
+  oversizeError: string;
+  raisedCeilingRenders: boolean;
+  zeroCeilingRenders: boolean;
 }
 
 test('the installed @plantuml/core still matches the adapter contract', async ({page}) => {
@@ -53,11 +57,26 @@ test('the installed @plantuml/core still matches the adapter contract', async ({
     const colors = (svg: string) =>
       [...new Set(svg.match(/#[0-9A-Fa-f]{6}/g) ?? [])].sort().join(',');
 
+    // Tall enough to pass the engine's own 8192-point default without being slow to lay out.
+    const oversize = [
+      '@startuml',
+      ...Array.from({length: 120}, (_, index) => `class C${index}`),
+      ...Array.from({length: 119}, (_, index) => `C${index} --> C${index + 1}`),
+      '@enduml',
+    ].join('\n');
+
     const sequence = '@startuml\nAlice -> Bob : Hello\nreturn ok\n@enduml';
     const light = await call(sequence);
     const dark = await call(sequence, {dark: true});
     const explicitLight = await call(sequence, {dark: false});
     const invalid = await call('@startuml\nthis is definitely not valid ###\nAlice ->\n@enduml');
+
+    // `maxSvgSize` is what replaced this plugin's old rewrite of the engine's size ceiling.
+    // If a release drops or renames it, every large diagram silently reverts to the engine's
+    // 8192-point default while `options.maxSvgSize` still reads as if it were honoured.
+    const oversizeDefault = await call(oversize);
+    const oversizeRaised = await call(oversize, {maxSvgSize: 65_536});
+    const oversizeUnbounded = await call(oversize, {maxSvgSize: 0});
 
     const invalidDoc = invalid.svg
       ? new DOMParser().parseFromString(invalid.svg, 'image/svg+xml')
@@ -71,6 +90,10 @@ test('the installed @plantuml/core still matches the adapter contract', async ({
       darkColors: colors(dark.svg ?? ''),
       darkDiffersFromLight: light.svg !== dark.svg,
       explicitLightMatchesDefault: explicitLight.svg === light.svg,
+      defaultCeilingRefusesOversize: !oversizeDefault.ok,
+      oversizeError: oversizeDefault.err ?? '',
+      raisedCeilingRenders: oversizeRaised.ok && (oversizeRaised.svg ?? '').includes('<svg'),
+      zeroCeilingRenders: oversizeUnbounded.ok && (oversizeUnbounded.svg ?? '').includes('<svg'),
       invalidResolvesSuccessfully: invalid.ok,
       invalidText: invalidDoc
         ? Array.from(invalidDoc.querySelectorAll('text'))
@@ -91,6 +114,15 @@ test('the installed @plantuml/core still matches the adapter contract', async ({
   expect(probe.darkDiffersFromLight).toBe(true);
   expect(probe.lightColors).not.toBe(probe.darkColors);
   expect(probe.explicitLightMatchesDefault).toBe(true);
+
+  // The `maxSvgSize` option is honoured by the string API: a diagram over the engine's own
+  // default is refused, the same diagram renders under a raised ceiling, and `0` removes the
+  // ceiling entirely. This is the guard that replaced the engine-rewrite canary.
+  expect(probe.defaultCeilingRefusesOversize).toBe(true);
+  expect(probe.oversizeError).toContain('Diagram too large for browser rendering');
+  expect(probe.oversizeError).toContain('maxSvgSize');
+  expect(probe.raisedCeilingRenders).toBe(true);
+  expect(probe.zeroCeilingRenders).toBe(true);
 
   // Invalid PlantUML is delivered through the *success* callback as an error picture, which
   // is why the renderer inspects the SVG text instead of trusting onError alone.

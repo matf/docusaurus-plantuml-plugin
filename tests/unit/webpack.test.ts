@@ -59,7 +59,7 @@ describe('runtime asset emission', () => {
     const copyPlugin = result.plugins[0] as {patterns: Array<{from: string; to: string}>};
     expect(copyPlugin.patterns).toHaveLength(2);
     for (const pattern of copyPlugin.patterns) {
-      expect(pattern.to).toMatch(/^assets\/plantuml-client-\d+\.\d+\.\d+-max32768\/\[name]\[ext]$/);
+      expect(pattern.to).toMatch(/^assets\/plantuml-client-\d+\.\d+\.\d+\/\[name]\[ext]$/);
     }
     expect(copyPlugin.patterns.map((p) => p.from.split('/').pop())).toEqual([
       'viz-global.js',
@@ -67,7 +67,10 @@ describe('runtime asset emission', () => {
     ]);
   });
 
-  it('serves the patched engine, not the vendored one', () => {
+  // Both runtime files used to be emitted from a generated copy, because the engine was
+  // rewritten to raise its size ceiling. `maxSvgSize` replaced that, so what ships is the
+  // vendored file and nothing is generated under `.docusaurus` at all.
+  it('serves the vendored engine straight out of node_modules', () => {
     const plugin = plantumlPlugin(context, {stdlib: false});
     const result = plugin.configureWebpack?.({}, false, utils, undefined) as {
       plugins: Array<{patterns?: unknown}>;
@@ -75,10 +78,9 @@ describe('runtime asset emission', () => {
     const copyPlugin = result.plugins[0] as {patterns: Array<{from: string}>};
     const [viz, engine] = copyPlugin.patterns;
 
-    // Only the engine is rewritten; Graphviz is copied straight out of node_modules.
-    expect(viz?.from).toContain(`${path.sep}node_modules${path.sep}`);
-    expect(engine?.from.startsWith(path.join(siteDir, '.docusaurus'))).toBe(true);
-    expect(fs.readFileSync(engine?.from as string, 'utf8')).toContain(' (max 32768)');
+    expect(viz?.from).toContain(`${path.sep}node_modules${path.sep}@plantuml${path.sep}core`);
+    expect(engine?.from).toContain(`${path.sep}node_modules${path.sep}@plantuml${path.sep}core`);
+    expect(fs.existsSync(path.join(siteDir, '.docusaurus', 'plantuml-engine'))).toBe(false);
   });
 
   it('emits every vendored standard library bundle beside the runtime', () => {
@@ -97,7 +99,7 @@ describe('runtime asset emission', () => {
     // from a cache populated before it.
     for (const pattern of stdlibPatterns) {
       expect(pattern.to).toMatch(
-        /^assets\/plantuml-client-\d+\.\d+\.\d+-max32768\/stdlib-[0-9a-f]{12}\/\[name]\[ext]$/,
+        /^assets\/plantuml-client-\d+\.\d+\.\d+\/stdlib-[0-9a-f]{12}\/\[name]\[ext]$/,
       );
     }
   });

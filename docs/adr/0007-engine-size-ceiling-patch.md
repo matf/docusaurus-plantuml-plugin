@@ -1,9 +1,15 @@
 # ADR 0007 — Patch `@plantuml/core`'s 4096-point diagram ceiling instead of living with it
 
-- Status: accepted
+- Status: superseded by [ADR 0008](0008-configurable-max-svg-size.md)
 - Date: 2026
 - Affects: `src/enginePatch.ts`, `src/constants.ts`, `src/index.ts`,
   `tests/unit/enginePatch.test.ts`
+
+> **Superseded.** `@plantuml/core@1.2026.8` added a `maxSvgSize` render option
+> ([plantuml/plantuml#2832](https://github.com/plantuml/plantuml/issues/2832)), which does
+> directly what this record's patch did indirectly. The patch has been removed; the evidence
+> below is kept because it is still what justifies the default the option now carries, and
+> because the "Not configurable" reasoning here is exactly what ADR 0008 revisits.
 
 ## Context
 

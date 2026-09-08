@@ -1,10 +1,12 @@
 import {useEffect, type MutableRefObject} from 'react';
 
+import generatedRoutes from '@generated/routes';
 import {useHistory} from '@docusaurus/router';
 import {useBaseUrlUtils} from '@docusaurus/useBaseUrl';
 
 import type {DiagramEngine} from '../../runtime/types.js';
 import {attachDiagramLinks, detachDiagramLinks, extractSourceLinks} from './diagramLinks.js';
+import {isRoutedPathname} from './routeMatching.js';
 
 /**
  * Author-written links inside one diagram: synthesis and navigation.
@@ -14,13 +16,16 @@ import {attachDiagramLinks, detachDiagramLinks, extractSourceLinks} from './diag
  * `diagramLinks.ts` for the correlation. Graphviz needs none of this; `URL=` already emits
  * real anchors.
  *
- * **Navigation** (both engines): a click on any in-diagram link to a same-site URL goes
- * through the router instead of a full page load, so a node can link to a diagram on
+ * **Navigation** (both engines): a click on any in-diagram link to a URL *this build routes*
+ * goes through the router instead of a full page load, so a node can link to a diagram on
  * another page and arrive instantly — with the target page's diagrams reacting to the
  * hash through the same router-driven deep-link tracking. Site-absolute paths get the
  * site's `baseUrl`, exactly as markdown links do, so authors write the same `/docs/…`
  * everywhere. External links and pure `#…` anchors stay native: the browser handles both
  * correctly on its own, and the router observes hash navigations anyway.
+ *
+ * A same-origin path that this build does *not* route stays native too. See
+ * `routeMatching.ts` for why that matters on a site published as several builds.
  */
 
 export interface UseDiagramLinksParams {
@@ -88,6 +93,9 @@ export function useDiagramLinks({
         return;
       }
       if (url.origin !== window.location.origin) return;
+      // Same origin is not the same bundle. A path this build has no route for must reach
+      // the server, which can serve it, rather than this build's own "Page not found".
+      if (!isRoutedPathname(generatedRoutes, url.pathname)) return;
 
       event.preventDefault();
       history.push(url.pathname + url.search + url.hash);
