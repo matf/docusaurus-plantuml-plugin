@@ -651,6 +651,12 @@ screen. The **fit** button (present only in this view) returns to that scale aft
 or panning. <kbd>Escape</kbd> or the maximize button restores the inline view, along with
 whatever zoom level you had before.
 
+It is the **last button in the toolbar**, in both views. It is the only control whose
+neighbours come and go — fit arrives with the maximized view, search and the minimap toggle
+leave with the source — so anywhere in the middle it would shift under the pointer between
+clicks. At the end it holds still, and the `✕` that closes the maximized view sits where a
+reader looking to close something looks first.
+
 This is an in-page overlay rather than the Fullscreen API. `requestFullscreen()` takes the
 entire browser window fullscreen in Firefox instead of presenting the element, and its
 `::backdrop` sits outside the element so the page shows through behind the diagram. An overlay

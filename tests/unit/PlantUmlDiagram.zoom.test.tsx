@@ -215,6 +215,26 @@ describe('accessible structure', () => {
     expect(screen.queryByRole('button', {name: 'Fit diagram to screen'})).toBeNull();
   });
 
+  it('keeps maximize last in the toolbar, so the fullscreen close is the rightmost button', async () => {
+    // The button its neighbours move around: Fit appears with the maximized view, Search and
+    // the minimap toggle vanish with the source. Anywhere in the middle it changes position
+    // between clicks; at the end it holds still.
+    await renderReady();
+
+    const labels = () =>
+      within(screen.getByRole('group', {name: /zoom controls/}))
+        .getAllByRole('button')
+        .map((button) => button.getAttribute('aria-label'));
+
+    expect(labels().at(-1)).toBe('Maximize diagram');
+
+    act(() => screen.getByRole('button', {name: 'Maximize diagram'}).click());
+
+    // Fit joins the row while maximized, and still does not come after the close control.
+    expect(labels()).toContain('Fit diagram to screen');
+    expect(labels().at(-1)).toBe('Maximize diagram');
+  });
+
   it('draws every control as SVG rather than as a font character', async () => {
     // `⛶` U+26F6 has no glyph in any font a stock Linux desktop ships, so the maximize
     // control rendered as a tofu box; the others only worked because DejaVu Sans happened to

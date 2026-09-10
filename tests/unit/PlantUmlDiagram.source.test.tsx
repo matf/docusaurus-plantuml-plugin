@@ -1,4 +1,4 @@
-import {act, render, screen, waitFor} from '@testing-library/react';
+import {act, render, screen, waitFor, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
@@ -385,6 +385,21 @@ describe('flipping the frame', () => {
     await user.click(toggle());
 
     expect(screen.getByRole('button', {name: 'Maximize diagram'})).toBeInTheDocument();
+  });
+
+  it('keeps maximize last in the toolbar, behind Copy', async () => {
+    // Copy joins the row with the source view, and the control that leaves the fullscreen
+    // view stays the rightmost one.
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(toggle());
+
+    const labels = within(screen.getByRole('group', {name: /zoom controls/}))
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label'));
+    expect(labels).toContain('Copy PlantUML source to clipboard');
+    expect(labels.at(-1)).toBe('Maximize diagram');
   });
 
   it('works while the diagram is maximized', async () => {

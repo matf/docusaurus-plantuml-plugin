@@ -629,17 +629,8 @@ export default function PlantUmlDiagram({
                   <FitIcon />
                 </button>
               )}
-              <button
-                type="button"
-                className={styles.toolbarButton}
-                aria-label="Maximize diagram"
-                aria-pressed={zoom.maximized}
-                onClick={zoom.toggleMaximize}
-              >
-                {zoom.maximized ? <CloseIcon /> : <MaximizeIcon />}
-              </button>
               {/*
-               * Beside Maximize rather than in a row of its own beneath the picture. A whole
+               * In the toolbar rather than in a row of its own beneath the picture. A whole
                * row for one button read as a stray control, and put it a diagonal away from
                * everything else a reader might press. The map it opens still appears in the
                * picture's bottom-left corner — that is where a minimap belongs, and it must
@@ -658,6 +649,23 @@ export default function PlantUmlDiagram({
               )}
               {sourceToggle}
               {copyControl}
+              {/*
+               * Last in the row, so the control that leaves the fullscreen view is always the
+               * one at the end of it. Maximize is the only button whose neighbours come and go
+               * — Fit appears with the maximized view, Search and the minimap toggle vanish
+               * with the source — so anywhere in the middle it slid under the reader's pointer
+               * between clicks. At the end it holds still, and the `✕` sits where a reader
+               * looking to close something looks first.
+               */}
+              <button
+                type="button"
+                className={styles.toolbarButton}
+                aria-label="Maximize diagram"
+                aria-pressed={zoom.maximized}
+                onClick={zoom.toggleMaximize}
+              >
+                {zoom.maximized ? <CloseIcon /> : <MaximizeIcon />}
+              </button>
               {/* Hidden from assistive tech: a live percentage would announce on every tick. */}
               <span
                 ref={zoom.readoutRef}
