@@ -71,6 +71,12 @@ test.describe('zoom and pan', () => {
     // In the toolbar, not in a row of its own beneath the picture.
     await expect(group.getByRole('button', {name: 'Show minimap'})).toBeVisible();
     await expect(group.getByRole('button', {name: 'Show diagram source'})).toBeVisible();
+    // Maximize is last, so the `✕` that leaves the fullscreen view is the rightmost button
+    // wherever its neighbours come and go.
+    await expect(group.getByRole('button').last()).toHaveAttribute(
+      'aria-label',
+      'Maximize diagram',
+    );
 
     // Every control is drawn, not typed. `⛶` U+26F6 had no glyph on a stock Linux desktop,
     // so the maximize button used to render as a tofu box for a whole platform's readers.
