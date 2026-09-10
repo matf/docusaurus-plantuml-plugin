@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The maximize button is now the last one in the toolbar.** It used to sit in the middle of
+  the row, which put the `✕` that closes the maximized view third from the right — behind the
+  minimap and source toggles. It is the one control whose neighbours come and go, so in the
+  middle it moved under the pointer between clicks. At the end of the row it holds still in
+  every state. Nothing else moved, and no label, shortcut or `aria-*` attribute changed.
+
 ## [1.8.1] - 2026-09-08
 
 ### Changed
