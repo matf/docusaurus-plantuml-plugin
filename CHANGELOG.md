@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.6] - 2026-09-14
+
+### Changed
+
+- Bump the all group across 1 directory with 7 updates (#45)
+
 ## [1.8.5] - 2026-09-10
 
 ### Changed
@@ -751,7 +757,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.5...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.6...HEAD
+[1.8.6]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.5...v1.8.6
 [1.8.5]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.4...v1.8.5
 [1.8.4]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.3...v1.8.4
 [1.8.3]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.2...v1.8.3
