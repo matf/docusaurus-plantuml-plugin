@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.7] - 2026-10-19
+
 ### Changed
 
 - Bump image-size from 2.0.2 to 2.0.4 in /examples/docusaurus in the all-security group (#47)
@@ -766,7 +768,8 @@ Initial release.
   opt-out.
 - Plugin option validation that rejects unknown keys and out-of-range values at build time.
 
-[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.6...HEAD
+[Unreleased]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.7...HEAD
+[1.8.7]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.6...v1.8.7
 [1.8.6]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.5...v1.8.6
 [1.8.5]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.4...v1.8.5
 [1.8.4]: https://github.com/matf/docusaurus-plantuml-plugin/compare/v1.8.3...v1.8.4
