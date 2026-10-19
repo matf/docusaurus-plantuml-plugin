@@ -106,7 +106,7 @@
     "prettier": "^3.6.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "tsup": "^8.5.0",
+    "tsup": "^9.0.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.67.0",
     "vitest": "^5.0.0"
