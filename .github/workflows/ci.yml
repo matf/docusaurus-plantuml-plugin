@@ -177,6 +177,13 @@ jobs:
             // >= 5.109. Without this override no Docusaurus 3.5-3.10.0 site can be built
             // from a fresh install at all, with or without this plugin.
             pkg.overrides = {...pkg.overrides, webpackbar: "^7.0.0"};
+            // Upstream, not us: webpack 5.111.1 moved lib/ContextReplacementPlugin.js into
+            // lib/context/, and @docusaurus/theme-classic 3.5.x requires the old path, so a
+            // 3.5 site cannot load the classic theme at all against current webpack.
+            // Docusaurus 3.6.0 dropped that require, so only the oldest supported line needs
+            // the pin and the newer jobs keep testing against the current webpack.
+            const [major, minor] = version.split(".").map(Number);
+            if (major === 3 && minor < 6) pkg.overrides.webpack = "<=5.111.0";
             fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
           ' "$version"
           cat examples/docusaurus/package.json
