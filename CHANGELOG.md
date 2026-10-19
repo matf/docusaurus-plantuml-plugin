@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bump image-size from 2.0.2 to 2.0.4 in /examples/docusaurus in the all-security group (#47)
+- **CI pins webpack to `<=5.111.0` for the oldest supported Docusaurus.** webpack 5.111.1 moved
+  `lib/ContextReplacementPlugin.js` into `lib/context/`, and `@docusaurus/theme-classic` 3.5.x
+  requires the old path, so the classic theme no longer loads on a 3.5 site built against a
+  current webpack — with or without this plugin. Docusaurus 3.6.0 dropped that require, so the
+  pin applies only to the 3.5.x job and the other jobs keep testing against the latest webpack.
+
 ## [1.8.6] - 2026-09-14
 
 ### Changed
