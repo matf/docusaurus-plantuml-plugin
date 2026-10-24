@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The package check no longer counts `CHANGELOG.md` toward the compiled-plugin size budget.**
+  The changelog grows with every release, and the 1.8.9 entry alone pushed the package to
+  448.1 KiB against the 448 KiB line, so 1.8.9 was tagged but never published to npm. Its
+  changes ship in this release instead. The changelog still counts toward the overall package
+  size budgets.
+
 ## [1.8.9] - 2026-10-22
 
 ### Changed
