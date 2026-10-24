@@ -69,6 +69,13 @@ const REQUIRED_FILES = [
 /** Vendored standard library bundles, which the size budgets account for separately. */
 const STDLIB_ASSET_PATTERN = /^assets\/stdlib\//;
 
+/**
+ * Left out of the code budget: the changelog grows with every release by design, so counting it
+ * would turn each release into a budget raise. 1.8.9 tripped the line on its changelog entry alone.
+ * It still counts toward the overall packed and unpacked budgets.
+ */
+const CODE_BUDGET_EXEMPT = new Set(['CHANGELOG.md']);
+
 const FORBIDDEN_PATTERNS = [
   {pattern: /\.map$/, reason: 'source maps are not published'},
   {pattern: /(^|\/)tests?\//, reason: 'test files must not be published'},
@@ -149,12 +156,12 @@ if (result.size > MAX_PACKED_BYTES) {
 // Budgeted apart from the standard library, so that vendoring more of it can never quietly
 // pay for the plugin's own code growing.
 const codeBytes = files
-  .filter((file) => !STDLIB_ASSET_PATTERN.test(file.path))
+  .filter((file) => !STDLIB_ASSET_PATTERN.test(file.path) && !CODE_BUDGET_EXEMPT.has(file.path))
   .reduce((total, file) => total + file.size, 0);
 if (codeBytes > MAX_CODE_UNPACKED_BYTES) {
   problems.push(
     `the compiled plugin is ${formatBytes(codeBytes)}, over the ` +
-      `${formatBytes(MAX_CODE_UNPACKED_BYTES)} budget for everything outside assets/stdlib.`,
+      `${formatBytes(MAX_CODE_UNPACKED_BYTES)} budget for everything outside assets/stdlib and the changelog.`,
   );
 }
 
