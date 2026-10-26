@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Bump the all group across 1 directory with 2 updates (#59)
+
+### Fixed
+
+- **The minimum-engine test no longer breaks on every `@plantuml/core` release.** It required
+  the installed engine to equal the minimum supported version, so any newer engine failed it
+  even though the plugin accepts it. It now checks that `package.json` declares that minimum
+  as its floor.
+
 ## [1.8.13] - 2026-10-24
 
 ### Changed
