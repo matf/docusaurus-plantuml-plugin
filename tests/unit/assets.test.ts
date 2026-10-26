@@ -4,6 +4,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {locatePlantUmlCore} from '../../src/assets.js';
 import {MINIMUM_CORE_VERSION} from '../../src/constants.js';
+import pkg from '../../package.json';
 
 /**
  * The build-time half of the §8.1 mitigation.
@@ -89,7 +90,11 @@ describe('the minimum supported @plantuml/core version', () => {
 
   it('accepts the version installed in this repository', () => {
     expect(() => locatePlantUmlCore()).not.toThrow();
-    expect(locatePlantUmlCore().version).toBe(MINIMUM_CORE_VERSION);
+  });
+
+  it('matches the floor package.json declares', () => {
+    // The lockfile moves ahead of the minimum on every engine release; the declared range must not.
+    expect(pkg.dependencies['@plantuml/core']).toBe(`^${MINIMUM_CORE_VERSION}`);
   });
 
   it('accepts a newer engine', () => {
